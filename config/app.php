@@ -16,10 +16,10 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Bintang Juara'),
-    'nama_instansi' => env('APP_NAMA_INSTANSI', 'Sekolah Islam Bintang Juara'),
+    'name' => env('APP_NAME', 'Raudhatul Jannah'),
+    'nama_instansi' => env('APP_NAMA_INSTANSI', 'Sidoarjo_Raudhatul_Jannah'),
     'alamat' => env('APP_ALAMAT', 'Kota Semarang, Prov. Jawa Tengah'),
-    'logo' => env('APP_LOGO', 'logo-bijur.jpeg'),
+    'logo' => env('APP_LOGO', 'icon-jannah.jpeg'),
     'email' => env('APP_EMAIL', 'ypisabkho@gmail.com'),
     'telepon' => env('APP_TELEPON', 'SIKEU'),
     'domisili' => env('APP_DOMISILI', 'Semarang'),

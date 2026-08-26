@@ -51,7 +51,7 @@
                         <a href="{{route('index')}}" class="app-brand-link gap-2">
                             <span class="app-brand-logo demo">
                                 <span style="color: #666cff">
-                                        <img width="100" height="100" src="{{asset(config('app.logo'))}}" alt="logo">
+                                        <img src="{{asset(config('app.logo'))}}" alt="logo" class="login-brand-logo">
                                 </span>
                             </span>
                         </a>

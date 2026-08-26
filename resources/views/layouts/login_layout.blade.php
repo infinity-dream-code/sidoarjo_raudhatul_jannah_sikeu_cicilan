@@ -33,6 +33,20 @@
             vertical-align: middle
         }
 
+        .login-brand-logo {
+            width: auto !important;
+            height: auto !important;
+            max-width: min(280px, 100%);
+            max-height: 96px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .authentication-inner .app-brand-link {
+            width: 100%;
+            justify-content: center;
+        }
+
         .transparent-swal2 .swal2-popup {
             background-color: transparent !important; /* Make dialog background transparent */
             box-shadow: none !important; /* Remove box-shadow */

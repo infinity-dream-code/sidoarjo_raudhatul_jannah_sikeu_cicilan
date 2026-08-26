@@ -77,6 +77,20 @@
             vertical-align: middle
         }
 
+        .sidebar-brand-logo {
+            width: auto !important;
+            height: auto !important;
+            max-width: 140px;
+            max-height: 40px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .navbar-dropdown .avatar img {
+            object-fit: contain;
+            background: #fff;
+        }
+
         .form-fieldset {
             padding: 1rem;
             margin-bottom: 1rem;

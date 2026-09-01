@@ -26,7 +26,7 @@ class ValidationMessage extends Model
             "kelas" => "kelas",
             "kelompok" => "kelompok",
             "unit" => "unit",
-            "kode" => "kode",
+            "kode" => "Kode",
             "code" => "kode",
             "nis" => "Nomor Induk Siswa",
             "no_pendaftaran" => "Nomor Pendaftaran",
@@ -42,6 +42,8 @@ class ValidationMessage extends Model
             "tagihan" => "Tagihan",
             "client_name_wa" => "Nama Client WA",
             "no_wa" => "No WA",
+            "template" => "Isi Template",
+            "is_active" => "Status",
             "Title" => "Judul",
             "Payload" => "Isi Pengumuman",
         ];

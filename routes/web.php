@@ -102,6 +102,17 @@ Route::prefix("admin")
                     Route::get("get-column", "getColumn")->name("get-column");
                     Route::resource("", \App\Http\Controllers\Admin\MasterData\PindahKelasController::class)->parameters(["" => "id"]);
                 });
+
+            Route::prefix("template-wa")
+                ->name("template-wa.")
+                ->controller(\App\Http\Controllers\Admin\MasterData\TemplateWaController::class)
+                ->group(function () {
+                    Route::get("get-data", "getData")->name("get-data");
+                    Route::get("get-column", "getColumn")->name("get-column");
+                });
+            Route::resource("template-wa", \App\Http\Controllers\Admin\MasterData\TemplateWaController::class)
+                ->names("template-wa")
+                ->except(["create", "show", "edit"]);
         });
 
         Route::prefix("keuangan")->name("keuangan.")->group(function () {

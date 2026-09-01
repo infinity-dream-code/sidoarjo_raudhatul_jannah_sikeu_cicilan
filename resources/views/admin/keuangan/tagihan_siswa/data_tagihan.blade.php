@@ -832,6 +832,20 @@
                     }
                 }
             }
+            if (e.target.closest('.btn-kirim-wa')) {
+                const rowEl = e.target.closest('tr');
+                if (!rowEl) return;
+                const rowData = DT[`${dtOptions.tableId}`].row(rowEl).data();
+                if (!rowData) {
+                    warningAlert('Data baris tidak ditemukan.');
+                    return;
+                }
+                if (!rowData.wa_url) {
+                    warningAlert('Nomor WhatsApp siswa belum diisi. Lengkapi No WA di Data Siswa.');
+                    return;
+                }
+                window.open(rowData.wa_url, '_blank');
+            }
         });
 
         $(document).on('click', '#main_table tbody .btn-detail-trx', async function (e) {

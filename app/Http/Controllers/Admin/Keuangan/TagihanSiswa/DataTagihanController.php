@@ -15,6 +15,7 @@ use App\Models\ValidationMessage;
 use App\Support\CacheHandler;
 use App\Support\FilterHandler;
 use App\Support\TagihanPaymentReversal;
+use App\Support\WhatsappTagihan;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -160,6 +161,22 @@ class DataTagihanController extends Controller
                 'searchable' => true,
                 'orderable' => true,
                 'exportable' => true,
+                'duplicate' => false,
+            ],
+            [
+                'data' => 'kirim_wa',
+                'name' => 'Kirim WA',
+                'orderable' => false,
+                'dataVal' => false,
+                'columnType' => 'button',
+                'className' => 'text-center exclude-selection',
+                'excludeFromSelection' => true,
+                'button' => 'action',
+                'buttonText' => 'Kirim WA',
+                'buttonClass' => 'btn btn-sm btn-whatsapp btn-kirim-wa',
+                'buttonLink' => '#',
+                'buttonIcon' => 'ri-whatsapp-line me-2',
+                'exportable' => false,
                 'duplicate' => false,
             ],
             [
@@ -579,7 +596,7 @@ class DataTagihanController extends Controller
         $columnName = 'scctbill.FUrutan';
         $columnSortOrder = 'asc';
         $userOrdered = false;
-        $nonSortableData = ['AA', 'naik', 'turun', 'delete', 'hapus', 'print', 'NOVA', 'detail_trx'];
+        $nonSortableData = ['AA', 'naik', 'turun', 'delete', 'hapus', 'print', 'NOVA', 'detail_trx', 'kirim_wa'];
 
         if (!empty($order_arr)) {
             $columnIndex = $columnIndex_arr[0]['column'] ?? null;
@@ -638,6 +655,7 @@ class DataTagihanController extends Controller
             'scctcust.CODE02',
             'scctcust.DESC02',
             'scctcust.DESC03',
+            'scctcust.NO_WA',
             'scctbill.AA',
             'scctbill.BILLNM',
             'scctbill.BILLAC',
@@ -745,9 +763,10 @@ class DataTagihanController extends Controller
             ->get();
 
         $lastPaymentDates = $this->getLastPaymentDatesForBills($rows);
+        $waTemplate = WhatsappTagihan::activeTemplate();
 
         $records = $rows
-            ->map(function ($item, $index) use ($lastPaymentDates) {
+            ->map(function ($item, $index) use ($lastPaymentDates, $waTemplate) {
                 $row = $item->toArray();
                 $get = static fn (string $key) => $row[$key] ?? $row[strtolower($key)] ?? null;
 
@@ -758,6 +777,23 @@ class DataTagihanController extends Controller
                 $billPaid = (int) ($get('BILLPAID') ?? 0);
                 $paidDtRaw = $get('PAIDDT');
                 $paidDtDisplay = $this->resolvePaidDateDisplay($paidDtRaw, $billPaid, $aa, $lastPaymentDates);
+                $noVa = ($nocust && $nocust !== '-') ? scctcust::showVA($nocust) : null;
+                $kelasLabel = trim((string) ($get('DESC02') ?? '') . ' ' . (string) ($get('DESC03') ?? ''));
+                $noWa = $get('NO_WA');
+                $waMessage = WhatsappTagihan::applyTemplate($waTemplate, [
+                    'nama' => $get('NMCUST') ?: '-',
+                    'nis' => ($nocust && $nocust !== '-') ? $nocust : '-',
+                    'no_daftar' => ($num2nd && $num2nd !== '-') ? $num2nd : '-',
+                    'kelas' => $kelasLabel !== '' ? $kelasLabel : '-',
+                    'kelompok' => $get('DESC03') ?: '-',
+                    'unit' => $get('CODE02') ?: '-',
+                    'nama_tagihan' => $get('BILLNM') ?: '-',
+                    'periode' => $get('BILLAC') ?: '-',
+                    'jumlah_tagihan' => WhatsappTagihan::formatRupiah($get('BILLAM')),
+                    'terbayar' => WhatsappTagihan::formatRupiah($get('BILLPAID')),
+                    'sisa_tagihan' => WhatsappTagihan::formatRupiah($get('PAYMENTLEFT')),
+                    'no_va' => $noVa ?: '-',
+                ]);
 
                 $canHapus = $this->canHapusTagihan($item);
 
@@ -767,11 +803,12 @@ class DataTagihanController extends Controller
                     'CUSTID' => $get('CUSTID'),
                     'NOCUST' => ($nocust && $nocust !== '-') ? $nocust : null,
                     'NUM2ND' => ($num2nd && $num2nd !== '-') ? $num2nd : null,
-                    'NOVA' => ($nocust && $nocust !== '-') ? scctcust::showVA($nocust) : null,
+                    'NOVA' => $noVa,
                     'NMCUST' => $get('NMCUST'),
                     'CODE02' => $get('CODE02'),
                     'DESC02' => $get('DESC02'),
                     'DESC03' => $get('DESC03'),
+                    'NO_WA' => $noWa,
                     'BILLNM' => $get('BILLNM'),
                     'BILLAM_TOTAL' => $get('BILLAM'),
                     'BILLAM' => $get('PAYMENTLEFT'),
@@ -791,6 +828,8 @@ class DataTagihanController extends Controller
                     'TRX_LOGS' => [],
                     'BILL_TRANSNO' => $get('BILL_TRANSNO'),
                     'print' => true,
+                    'kirim_wa' => true,
+                    'wa_url' => WhatsappTagihan::waMeUrl($noWa, $waMessage),
                     'delete' => $billPaid > 0,
                     'delete_label' => 'Reversal',
                     'hapus' => $canHapus,

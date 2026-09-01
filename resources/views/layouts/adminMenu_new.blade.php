@@ -67,6 +67,11 @@
                         <div data-i18n="Pindah Kelas">Pindah Kelas</div>
                     </a>
                 </li>
+                <li class="menu-item {{ Request::is(['admin/master-data/template-wa*']) ? 'active' : '' }}">
+                    <a href="{{ route('admin.master-data.template-wa.index') }}" class="menu-link">
+                        <div data-i18n="Template WA">Template WA</div>
+                    </a>
+                </li>
             </ul>
         </li>
         <li class="menu-item {{ Request::is(['admin/keuangan*']) ? 'active open' : '' }}">

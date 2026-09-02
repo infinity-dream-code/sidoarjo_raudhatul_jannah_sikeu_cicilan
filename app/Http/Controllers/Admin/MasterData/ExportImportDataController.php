@@ -236,13 +236,17 @@ class ExportImportDataController extends Controller
         }
 
         try {
-            DB::connection('DATA_MYSQL')->beginTransaction();
+            // Metode 1 memakai stored procedure InputSiswa yang sudah COMMIT sendiri.
+            // Jangan bungkus dengan transaksi Laravel, supaya commit() tidak error
+            // "There is no active transaction".
+            $usesLaravelTransaction = $request->metode !== '1';
+            if ($usesLaravelTransaction) {
+                DB::connection('DATA_MYSQL')->beginTransaction();
+            }
 
             if ($request->metode == '1') {
                 $invalidCount = collect($data)->where('status', 0)->count();
                 if ($invalidCount > 0) {
-                    DB::connection('DATA_MYSQL')->rollBack();
-
                     return response()->json([
                         'message' => "Ada {$invalidCount} baris bermasalah. Perbaiki data di kolom Keterangan terlebih dahulu.",
                     ], 422);
@@ -250,8 +254,6 @@ class ExportImportDataController extends Controller
 
                 $rows = array_filter($data, fn ($item) => !empty($item['nis'] ?? null));
                 if (empty($rows)) {
-                    DB::connection('DATA_MYSQL')->rollBack();
-
                     return response()->json(['message' => 'Tidak ada baris dengan NIS yang dapat disimpan'], 422);
                 }
 
@@ -267,8 +269,6 @@ class ExportImportDataController extends Controller
                     $kelas = mst_kelas::findForImport($item['unit'], $item['kelas'], $item['kelompok']);
 
                     if (!$thnAka || !$kelas) {
-                        DB::connection('DATA_MYSQL')->rollBack();
-
                         return response()->json([
                             'message' => 'Silahkan periksa kembali kelas/tahun akademik siswa',
                             'nis' => $nis,
@@ -292,8 +292,6 @@ class ExportImportDataController extends Controller
                 }
 
                 if ($saved === 0) {
-                    DB::connection('DATA_MYSQL')->rollBack();
-
                     return response()->json(['message' => 'Tidak ada data siswa yang berhasil diproses'], 422);
                 }
             } elseif ($request->metode == '2') {
@@ -324,7 +322,7 @@ class ExportImportDataController extends Controller
                             'sekolah' => $sekolah?->CODE01,
                         ]);
 
-                        DB::connection('DATA_MYSQL')->rollBack();
+                        $this->rollBackIfActive();
 
                         return response()->json([
                             'message' => 'Silahkan periksa kembali kelas/thn_aka siswa',
@@ -337,7 +335,7 @@ class ExportImportDataController extends Controller
                         if (!empty($item['nis'])) {
                             $existingNis = scctcust::where('NOCUST', $item['nis'])->first();
                             if ($existingNis) {
-                                DB::connection('DATA_MYSQL')->rollBack();
+                                $this->rollBackIfActive();
 
                                 return response()->json(['message' => 'Gagal, siswa dengan NIS :' . $item['nis'] . ' sudah ada!'], 422);
                             }
@@ -390,7 +388,7 @@ class ExportImportDataController extends Controller
 
                     $existingNis = scctcust::where('NOCUST', $item['nis'])->first();
                     if ($existingNis) {
-                        DB::connection('DATA_MYSQL')->rollBack();
+                        $this->rollBackIfActive();
 
                         return response()->json(['message' => 'Gagal, NIS :' . $item['nis'] . ' sudah ada!'], 422);
                     }
@@ -404,12 +402,12 @@ class ExportImportDataController extends Controller
                 }
             }
 
-            DB::connection('DATA_MYSQL')->commit();
+            $this->commitIfActive();
             Cache::forget($this->cacheKey);
 
             return response()->json(['message' => 'Sukses, data siswa telah disimpan, silahkan periksa kembali'], 200);
         } catch (\Throwable $e) {
-            DB::connection('DATA_MYSQL')->rollBack();
+            $this->rollBackIfActive();
 
             Log::error('export_import_data.validateData.failed', [
                 'metode' => $request->metode,
@@ -432,6 +430,22 @@ class ExportImportDataController extends Controller
     {
         Cache::forget($this->cacheKey);
         return response()->json(['message' => 'Data dibersihkan'], 200);
+    }
+
+    private function commitIfActive(): void
+    {
+        $connection = DB::connection('DATA_MYSQL');
+        if ($connection->transactionLevel() > 0) {
+            $connection->commit();
+        }
+    }
+
+    private function rollBackIfActive(): void
+    {
+        $connection = DB::connection('DATA_MYSQL');
+        if ($connection->transactionLevel() > 0) {
+            $connection->rollBack();
+        }
     }
 
     private function normalizeImportItem(array $item): array

@@ -26,22 +26,32 @@ class InputSiswaProcedure
         ?string $ortu = null,
         ?string $code05 = null,
     ): void {
-        DB::connection('DATA_MYSQL')->statement(
-            'CALL InputSiswa(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [
-                $nimRaw,
-                $namaRaw,
-                (string) ($kelas->jenjang ?? ''),
-                (string) ($kelas->unit ?? ''),
-                (string) ($sekolah->CODE01 ?? ''),
-                (string) ($kelas->kelas ?? ''),
-                $angkatan,
-                (string) ($alamat ?? ''),
-                (string) ($gender ?? ''),
-                (string) ($ortu ?? ''),
-                (string) ($code05 ?? ''),
-            ]
-        );
+        $pdo = DB::connection('DATA_MYSQL')->getPdo();
+        $stmt = $pdo->prepare('CALL InputSiswa(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute([
+            $nimRaw,
+            $namaRaw,
+            (string) ($kelas->jenjang ?? ''),
+            (string) ($kelas->unit ?? ''),
+            (string) ($sekolah->CODE01 ?? ''),
+            (string) ($kelas->kelas ?? ''),
+            $angkatan,
+            (string) ($alamat ?? ''),
+            (string) ($gender ?? ''),
+            (string) ($ortu ?? ''),
+            (string) ($code05 ?? ''),
+        ]);
+
+        // Procedure MySQL sering mengembalikan extra result set.
+        // Kalau tidak dikosongkan, PDO melempar error padahal insert sudah sukses.
+        try {
+            do {
+                $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            } while ($stmt->nextRowset());
+        } catch (\PDOException) {
+            // Result set residual — insert sudah terjadi.
+        }
+        $stmt->closeCursor();
 
         Log::info('input-siswa.procedure.ok', [
             'nis' => $nimRaw,

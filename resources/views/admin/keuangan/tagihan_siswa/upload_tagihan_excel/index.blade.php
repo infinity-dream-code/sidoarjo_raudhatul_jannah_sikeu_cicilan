@@ -177,7 +177,7 @@
 
 @section('script')
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260902-ajax-reload"></script>
     <script src="{{asset('main/libs/select2/select2.min.js')}}"></script>
 
     <form id="formImport" enctype="multipart/form-data" class="mainForm"
@@ -484,7 +484,13 @@
                         .then(data => {
                             document.getElementById(formId).reset();
                             successAlert(data.message);
-                            dataReload("main_table");
+                            try {
+                                if (typeof dataReload === 'function') {
+                                    dataReload("main_table");
+                                }
+                            } catch (reloadError) {
+                                console.warn('Gagal refresh tabel setelah import', reloadError);
+                            }
                             document.querySelector(`#${formId} [data-bs-dismiss="modal"]`)?.click();
                         })
                         .catch(error => {

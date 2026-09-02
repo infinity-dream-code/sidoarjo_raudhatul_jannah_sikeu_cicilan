@@ -969,12 +969,15 @@ async function dataTableCreate(options) {
     const buttonDom = `${(buttonsConfig ? '<"row pb-3"<"dt-action-buttons d-flex justify-content-center justify-content-md-end px-5 px-md-3"B>">' : '')}`;
     const dom = `${buttonDom}<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6 d-flex justify-content-center justify-content-md-end"f>><"row dt-row"<"table-responsive"t>r><"row"<"col-sm-12 col-md-6 text-wrap"i><"col-sm-12 col-md-6"p>>`;
 
-    let languageData = localStorage.getItem(languageKey);
-
+    let languageData = null;
+    try {
+        const cachedLanguage = localStorage.getItem(languageKey);
+        languageData = cachedLanguage ? JSON.parse(cachedLanguage) : null;
+    } catch (error) {
+        languageData = null;
+    }
     if (!languageData) {
-        languageData = await fetchLanguageFile();
-    } else {
-        languageData = JSON.parse(languageData);
+        fetchLanguageFile();
     }
 
     DT[`${options.tableId}`] = idTable.DataTable({
@@ -1204,7 +1207,9 @@ async function dataTableCreate(options) {
         },
         footerCallback: function (row, data, start, end, display) {
             let api = this.api();
-            let json = this.api().ajax.json();
+            let json = api && api.ajax && typeof api.ajax.json === 'function'
+                ? api.ajax.json()
+                : null;
             const $footer = $(api.table().footer());
             $footer.empty();
             if (!json || !json.totals) {
@@ -1241,7 +1246,20 @@ async function dataTableCreate(options) {
 }
 
 function dataReload(id = null) {
-    id && DT[`${id}`].ajax.reload(null, false);
+    if (!id) {
+        return;
+    }
+
+    const table = DT[id];
+    if (table && table.ajax && typeof table.ajax.reload === 'function') {
+        table.ajax.reload(null, false);
+        return;
+    }
+
+    const $table = $(`#${id}`);
+    if ($.fn.DataTable && $.fn.DataTable.isDataTable($table)) {
+        $table.DataTable().ajax.reload(null, false);
+    }
 }
 
 function dataReFilter(id = null, formId = null) {

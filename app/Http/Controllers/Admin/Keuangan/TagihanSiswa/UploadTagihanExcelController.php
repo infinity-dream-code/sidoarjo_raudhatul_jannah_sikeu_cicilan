@@ -8,6 +8,7 @@ use App\Models\mst_tagihan;
 use App\Models\scctbill;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
+use App\Support\ExcelImportSheet;
 use App\Support\SchoolScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,7 +16,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
-use Maatwebsite\Excel\HeadingRowImport;
 use Maatwebsite\Excel\Validators\ValidationException;
 
 class UploadTagihanExcelController extends Controller
@@ -175,31 +175,17 @@ class UploadTagihanExcelController extends Controller
         $file = $request->file('fileImport');
 
         try {
-            $headingsData = (new HeadingRowImport)->toArray($file);
             $requiredColumns = ['nis', 'nama', 'unit', 'kelas', 'kelompok', 'angkatan', 'nominal'];
-            if (empty($headingsData) || !isset($headingsData[0][0])) {
-                throw new \Exception('Tidak dapat membaca judul kolom dari file. Pastikan file memiliki header yang sesuai.');
-            }
-            $headings = array_map(
-                static fn ($heading) => strtolower(trim((string) $heading)),
-                $headingsData[0][0]
+            $sheet = ExcelImportSheet::pickBest(
+                $file->getRealPath(),
+                $requiredColumns,
+                'nis',
+                [ExcelImportSheet::class, 'isTemplateSampleNis']
             );
-            $missingColumns = [];
-            foreach ($requiredColumns as $column) {
-                if (!in_array($column, $headings, true)) {
-                    $missingColumns[] = $column;
-                }
-            }
-
-            if (!empty($missingColumns)) {
-                $formattedMissingColumns = strtoupper(str_replace('_', ' ', implode(', ', $missingColumns)));
-                $formattedRequiredColumns = strtoupper(str_replace('_', ' ', implode(', ', $requiredColumns)));
-                throw new \Exception("Kolom $formattedMissingColumns tidak ditemukan.<br><hr> pastikan kolom berikut ada dan terisi pada file import yang akan diproses: $formattedRequiredColumns.");
-            }
 
             $cacheKey = $this->resolvedCacheKey();
             Cache::forget($cacheKey);
-            Excel::import(new ImportTagihanExcel($cacheKey), $file);
+            Excel::import(new ImportTagihanExcel($cacheKey, $sheet['index']), $file);
 
             $data = Cache::get($cacheKey, []);
             if (empty($data)) {
@@ -209,6 +195,8 @@ class UploadTagihanExcelController extends Controller
             Log::info('Upload tagihan excel berhasil', [
                 'user_id' => auth()->id(),
                 'file_name' => $file->getClientOriginalName(),
+                'sheet_name' => $sheet['name'],
+                'sheet_index' => $sheet['index'],
                 'row_count' => count($data),
             ]);
 

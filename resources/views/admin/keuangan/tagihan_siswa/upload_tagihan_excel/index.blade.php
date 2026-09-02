@@ -196,6 +196,7 @@
                             <li class="list-group-item list-group-timeline-danger">File harus berformat <span class="fw-bold">XLS/XLSX</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Ukuran file tidak boleh lebih dari <span class="fw-bold">1024KB/1MB</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Kolom yang harus terisi: <span class="fw-bold">NIS, Nominal</span>.</li>
+                            <li class="list-group-item list-group-timeline-danger">Jika file punya lebih dari 1 sheet, yang diimpor hanya sheet data siswa. Hapus sheet/baris contoh (NIS <span class="fw-bold">99999999…</span>).</li>
                             <li class="list-group-item list-group-timeline-danger">Contoh file yang dapat diproses untuk import:
                                 <a class="btn btn-sm btn-outline-primary fw-bolder"
                                    href="{{asset('contoh_excel/TEMPLATE MENU UPLOAD TAGIHAN EXCEL.xls')}}">

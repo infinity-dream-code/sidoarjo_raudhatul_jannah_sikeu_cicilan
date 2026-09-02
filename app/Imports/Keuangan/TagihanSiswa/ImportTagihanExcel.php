@@ -3,23 +3,31 @@
 namespace App\Imports\Keuangan\TagihanSiswa;
 
 use App\Models\scctcust;
+use App\Support\ExcelImportSheet;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class ImportTagihanExcel implements ToCollection, WithHeadingRow
+class ImportTagihanExcel implements WithMultipleSheets, ToCollection, WithHeadingRow
 {
-    public function __construct(private string $cacheKey = 'import_tagihan_excel')
+    public function __construct(
+        private string $cacheKey = 'import_tagihan_excel',
+        private int $sheetIndex = 0,
+    ) {
+    }
+
+    public function sheets(): array
     {
+        return [
+            $this->sheetIndex => $this,
+        ];
     }
 
     public function collection(Collection $collection): void
     {
-        $processedData = Cache::get($this->cacheKey, []);
-        if (!is_array($processedData)) {
-            $processedData = [];
-        }
+        $processedData = [];
 
         foreach ($collection as $row) {
             if ($row->filter()->isEmpty()) {
@@ -27,8 +35,11 @@ class ImportTagihanExcel implements ToCollection, WithHeadingRow
             }
 
             $rowData = $row->toArray();
-            $nis = $this->normalizeNis($rowData['nis'] ?? null);
+            $nis = ExcelImportSheet::normalizeId($rowData['nis'] ?? null);
             if ($nis === '' || strcasecmp($nis, 'nis') === 0) {
+                continue;
+            }
+            if (ExcelImportSheet::isTemplateSampleNis($nis)) {
                 continue;
             }
 
@@ -58,27 +69,6 @@ class ImportTagihanExcel implements ToCollection, WithHeadingRow
     public function headingRow(): int
     {
         return 1;
-    }
-
-    private function normalizeNis(mixed $value): string
-    {
-        if ($value === null || $value === '') {
-            return '';
-        }
-
-        if (is_int($value)) {
-            return (string) $value;
-        }
-
-        if (is_float($value)) {
-            if (floor($value) == $value) {
-                return (string) (int) $value;
-            }
-
-            return trim((string) $value);
-        }
-
-        return trim((string) $value);
     }
 
     private function appendKet(?string $current, string $message): string

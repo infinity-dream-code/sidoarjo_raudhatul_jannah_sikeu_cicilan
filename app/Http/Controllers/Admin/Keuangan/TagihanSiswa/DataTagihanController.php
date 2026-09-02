@@ -795,6 +795,8 @@ class DataTagihanController extends Controller
                     'no_va' => $noVa ?: '-',
                 ]);
 
+                $waUrl = WhatsappTagihan::waMeUrl($noWa, $waMessage);
+
                 $canHapus = $this->canHapusTagihan($item);
 
                 return [
@@ -828,8 +830,8 @@ class DataTagihanController extends Controller
                     'TRX_LOGS' => [],
                     'BILL_TRANSNO' => $get('BILL_TRANSNO'),
                     'print' => true,
-                    'kirim_wa' => true,
-                    'wa_url' => WhatsappTagihan::waMeUrl($noWa, $waMessage),
+                    'kirim_wa' => $waUrl !== null,
+                    'wa_url' => $waUrl,
                     'delete' => $billPaid > 0,
                     'delete_label' => 'Reversal',
                     'hapus' => $canHapus,

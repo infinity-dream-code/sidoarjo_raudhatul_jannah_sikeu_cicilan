@@ -10,47 +10,80 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class ImportTagihanPMBExcel implements ToCollection, WithHeadingRow
 {
+    public function __construct(private string $cacheKey = 'import_tagihan_pmb_excel')
+    {
+    }
+
     public function collection(Collection $collection): void
     {
-        $cacheKey = 'import_tagihan_pmb_excel';
-        $processedData = [];
+        $processedData = Cache::get($this->cacheKey, []);
+        if (!is_array($processedData)) {
+            $processedData = [];
+        }
 
         foreach ($collection as $row) {
-            if ($row->filter()->isEmpty()) continue;
+            if ($row->filter()->isEmpty()) {
+                continue;
+            }
+
             $rowData = $row->toArray();
+            $nodaftar = $this->normalizeCode($rowData['nodaftar'] ?? null);
             $rowData['status'] = 1;
             $status_ket = null;
 
-            if (!isset($rowData['nodaftar'])) {
+            if ($nodaftar === '') {
                 $rowData['status'] = 0;
-                $status_ket = 'NIS tidak boleh kosong';
-            }else{
-                $rowData['nodaftar'] = (string) $rowData['nodaftar'];
-                $checkData = scctcust::where('NUM2ND', $rowData['nodaftar'])->first();
+                $status_ket = 'Nomor pendaftaran tidak boleh kosong';
+            } else {
+                $rowData['nodaftar'] = $nodaftar;
+                $checkData = scctcust::where('NUM2ND', $nodaftar)->first();
                 if (!$checkData) {
                     $rowData['status'] = 0;
-                    if (!empty($status_ket)) $status_ket .= ', ';
-                    $status_ket .= "Nomor Pendaftaran : {$rowData['nodaftar']} tidak ditemukan";
+                    $status_ket = "Nomor Pendaftaran : {$nodaftar} tidak ditemukan";
                 }
             }
 
-            if (!isset($rowData['nominal'])) {
+            $nominal = $rowData['nominal'] ?? null;
+            if ($nominal === null || $nominal === '') {
                 $rowData['status'] = 0;
-                if (!empty($status_ket)) $status_ket .= ', ';
-                $status_ket .= 'Nominal tidak boleh kosong';
+                $status_ket = $this->appendKet($status_ket, 'Nominal tidak boleh kosong');
             }
 
             $rowData['keterangan'] = $status_ket;
             $processedData[] = $rowData;
         }
 
-        if (!empty($processedData)) {
-            Cache::put($cacheKey, $processedData, now()->addMinutes(60));
-        }
+        Cache::put($this->cacheKey, $processedData, now()->addMinutes(60));
     }
 
     public function headingRow(): int
     {
         return 1;
+    }
+
+    private function normalizeCode(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        if (is_int($value)) {
+            return (string) $value;
+        }
+
+        if (is_float($value) && floor($value) == $value) {
+            return (string) (int) $value;
+        }
+
+        return trim((string) $value);
+    }
+
+    private function appendKet(?string $current, string $message): string
+    {
+        if ($current === null || $current === '') {
+            return $message;
+        }
+
+        return $current . ', ' . $message;
     }
 }

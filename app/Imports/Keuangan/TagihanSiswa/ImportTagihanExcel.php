@@ -10,51 +10,83 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class ImportTagihanExcel implements ToCollection, WithHeadingRow
 {
-    /**
-    * @param Collection $collection
-    */
+    public function __construct(private string $cacheKey = 'import_tagihan_excel')
+    {
+    }
 
     public function collection(Collection $collection): void
     {
-        $cacheKey = 'import_tagihan_excel';
-        $processedData = [];
+        $processedData = Cache::get($this->cacheKey, []);
+        if (!is_array($processedData)) {
+            $processedData = [];
+        }
 
         foreach ($collection as $row) {
-            if ($row->filter()->isEmpty()) continue;
+            if ($row->filter()->isEmpty()) {
+                continue;
+            }
+
             $rowData = $row->toArray();
+            $nis = $this->normalizeNis($rowData['nis'] ?? null);
+            if ($nis === '' || strcasecmp($nis, 'nis') === 0) {
+                continue;
+            }
+
+            $rowData['nis'] = $nis;
             $rowData['status'] = 1;
             $status_ket = null;
 
-            if (!isset($rowData['nis'])) {
+            $checkData = scctcust::where('NOCUST', $nis)->first();
+            if (!$checkData) {
                 $rowData['status'] = 0;
-                $status_ket = 'NIS tidak boleh kosong';
-            }else {
-                $rowData['nis'] = (string) $rowData['nis'];
-                $checkData = scctcust::where('NOCUST', $rowData['nis'])->first();
-                if (!$checkData) {
-                    $rowData['status'] = 0;
-                    if (!empty($status_ket)) $status_ket .= ', ';
-                    $status_ket .= "NIS {$rowData['nis']} tidak ditemukan";
-                }
+                $status_ket = "NIS {$nis} tidak ditemukan";
             }
 
-            if (!isset($rowData['nominal'])) {
+            $nominal = $rowData['nominal'] ?? null;
+            if ($nominal === null || $nominal === '') {
                 $rowData['status'] = 0;
-                if (!empty($status_ket)) $status_ket .= ', ';
-                $status_ket .= 'Nominal tidak boleh kosong';
+                $status_ket = $this->appendKet($status_ket, 'Nominal tidak boleh kosong');
             }
 
             $rowData['keterangan'] = $status_ket;
             $processedData[] = $rowData;
         }
 
-        if (!empty($processedData)) {
-            Cache::put($cacheKey, $processedData, now()->addMinutes(60));
-        }
+        Cache::put($this->cacheKey, $processedData, now()->addMinutes(60));
     }
 
     public function headingRow(): int
     {
         return 1;
+    }
+
+    private function normalizeNis(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        if (is_int($value)) {
+            return (string) $value;
+        }
+
+        if (is_float($value)) {
+            if (floor($value) == $value) {
+                return (string) (int) $value;
+            }
+
+            return trim((string) $value);
+        }
+
+        return trim((string) $value);
+    }
+
+    private function appendKet(?string $current, string $message): string
+    {
+        if ($current === null || $current === '') {
+            return $message;
+        }
+
+        return $current . ', ' . $message;
     }
 }

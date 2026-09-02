@@ -27,6 +27,11 @@ class UploadTagihanExcelController extends Controller
 
     public ?string $sekolah = null;
 
+    private function resolvedCacheKey(): string
+    {
+        return $this->cacheKey . ':' . (Auth::id() ?? 'guest');
+    }
+
     public function __construct()
     {
         $this->middleware(function ($request, $next) {
@@ -51,6 +56,9 @@ class UploadTagihanExcelController extends Controller
         $data['periode_tahun_default'] = $currentYear;
         $data['periode_bulan_default'] = (int) date('m');
         $data['tagihan'] = mst_tagihan::orderBy('urut', 'asc')->get();
+
+        Cache::forget('import_tagihan_excel');
+        Cache::forget($this->resolvedCacheKey());
 
         return view('admin.keuangan.tagihan_siswa.upload_tagihan_excel.index', $data);
     }
@@ -101,7 +109,7 @@ class UploadTagihanExcelController extends Controller
         $filters = [];
         $filterQuery = null;
 
-        $cachedData = Cache::get($this->cacheKey, []);
+        $cachedData = Cache::get($this->resolvedCacheKey(), []);
 
         $nisList = collect($cachedData)->pluck('nis')->toArray();
         $nisCount = count($cachedData);
@@ -189,11 +197,11 @@ class UploadTagihanExcelController extends Controller
                 throw new \Exception("Kolom $formattedMissingColumns tidak ditemukan.<br><hr> pastikan kolom berikut ada dan terisi pada file import yang akan diproses: $formattedRequiredColumns.");
             }
 
-            DB::beginTransaction();
-            Excel::import(new ImportTagihanExcel(), $file);
-            DB::commit();
+            $cacheKey = $this->resolvedCacheKey();
+            Cache::forget($cacheKey);
+            Excel::import(new ImportTagihanExcel($cacheKey), $file);
 
-            $data = Cache::get($this->cacheKey, []);
+            $data = Cache::get($cacheKey, []);
             if (empty($data)) {
                 throw new \Exception('File berhasil dibaca, tetapi tidak ada baris data yang dapat diproses. Pastikan file berisi NIS dan Nominal.');
             }
@@ -206,7 +214,6 @@ class UploadTagihanExcelController extends Controller
 
             return response()->json(['message' => 'Sukses, data tagihan telah diimport, silahkan periksa kembali', 'data' => $data], 200);
         } catch (ValidationException $e) {
-            DB::rollBack();
             $errorMessages = $e->errors();
             $errorMessage = $errorMessages['error'][0] ?? 'Terjadi kesalahan saat melakukan import data.';
 
@@ -218,8 +225,6 @@ class UploadTagihanExcelController extends Controller
 
             return response()->json(['message' => $errorMessage, 'error' => $errorMessages], 422);
         } catch (\Throwable $e) {
-            DB::rollBack();
-
             Log::error('Upload tagihan excel gagal', [
                 'user_id' => auth()->id(),
                 'file_name' => $file?->getClientOriginalName(),
@@ -244,7 +249,7 @@ class UploadTagihanExcelController extends Controller
             'periode_bulan' => ['required', 'integer', 'min:1', 'max:12'],
         ], ValidationMessage::messages(), ValidationMessage::attributes());
 
-        $data = Cache::get($this->cacheKey);
+        $data = Cache::get($this->resolvedCacheKey());
         if (empty($data))return response()->json(['message' => 'Silahkan import data tagihan terlebih dahulu'], 422);
 
         $bta = sprintf('%04d%02d', (int) $request->periode_tahun, (int) $request->periode_bulan);
@@ -294,7 +299,7 @@ class UploadTagihanExcelController extends Controller
                 $insertedCount++;
             }
 
-            Cache::forget($this->cacheKey);
+            Cache::forget($this->resolvedCacheKey());
 
             DB::commit();
             $message = "Data tagihan disimpan! Berhasil dibuat untuk {$insertedCount} siswa.";

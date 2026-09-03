@@ -609,13 +609,6 @@
                     firstDay: 0,
                 },
                 maxDate: moment()
-            }, function (start, end) {
-                let duration = end.diff(start, 'days');
-                if (duration > 100) {
-                    warningAlert("Maksimal 100 hari.");
-                    date.data('daterangepicker').setStartDate(start);
-                    date.data('daterangepicker').setEndDate(start.clone().add(6, 'days'));
-                }
             });
 
             date.on('apply.daterangepicker hide.daterangepicker', function (ev, picker) {
@@ -626,13 +619,6 @@
 
             date.on('cancel.daterangepicker', function (ev, picker) {
                 $(this).val('');
-            });
-
-            date.on('apply.daterangepicker', function (ev, picker) {
-                let duration = picker.endDate.diff(picker.startDate, 'days');
-                if (duration > 6) {
-                    picker.setEndDate(picker.startDate.clone().add(2, 'days'));
-                }
             });
         });
 

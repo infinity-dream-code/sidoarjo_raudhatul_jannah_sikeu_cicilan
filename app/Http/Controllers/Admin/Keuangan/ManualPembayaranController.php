@@ -8,6 +8,7 @@ use App\Models\mst_tagihan;
 use App\Models\scctbill;
 use App\Models\scctcust;
 use App\Models\sccttran;
+use App\Models\scctva;
 use App\Models\User;
 use App\Models\ValidationMessage;
 use App\Support\ManualPaymentBuilder;
@@ -498,6 +499,12 @@ class ManualPembayaranController extends Controller
                 'tanggal' => $formattedDate,
                 'payments' => $paymentsForReceipt,
             ]]);
+
+            scctva::deactivateForStudent(
+                $siswa->NOCUST !== null ? (string) $siswa->NOCUST : null,
+                $siswa->CUSTID
+            );
+
             DB::connection('DATA_MYSQL')->commit();
             DB::commit();
             Log::info('manual-pembayaran.store.success', [

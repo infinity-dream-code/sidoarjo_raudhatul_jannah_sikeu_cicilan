@@ -3,7 +3,9 @@
 namespace App\Support;
 
 use App\Models\scctbill;
+use App\Models\scctcust;
 use App\Models\sccttran;
+use App\Models\scctva;
 use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +32,7 @@ class TagihanPaymentReversal
         );
 
         $tagihan->refresh();
+        $this->deactivateStudentVa($tagihan);
     }
 
     /** Hapus tagihan: batalkan semua pembayaran dari yang terakhir. */
@@ -120,5 +123,15 @@ class TagihanPaymentReversal
         }
 
         return (string) ($user->urut ?? Auth::id() ?? '');
+    }
+
+    private function deactivateStudentVa(scctbill $tagihan): void
+    {
+        $siswa = scctcust::query()->where('CUSTID', $tagihan->CUSTID)->first();
+
+        scctva::deactivateForStudent(
+            $siswa?->NOCUST !== null ? (string) $siswa->NOCUST : null,
+            $tagihan->CUSTID
+        );
     }
 }

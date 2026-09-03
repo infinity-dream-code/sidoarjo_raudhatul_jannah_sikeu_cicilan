@@ -14,10 +14,14 @@ use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 class ImportDataSiswa implements WithMultipleSheets, ToCollection, WithHeadingRow, SkipsEmptyRows
 {
+    public function __construct(private int $sheetIndex = 0)
+    {
+    }
+
     public function sheets(): array
     {
         return [
-            0 => $this,
+            $this->sheetIndex => $this,
         ];
     }
 

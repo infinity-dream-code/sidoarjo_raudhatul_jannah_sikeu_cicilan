@@ -102,8 +102,9 @@
                         <ul class="list-group list-group-timeline mb-3">
                             <li class="list-group-item list-group-timeline-danger">File harus berformat <span class="fw-bold">XLS/XLSX</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Ukuran file tidak boleh lebih dari <span class="fw-bold">1024KB/1MB</span>.</li>
-                            <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">NIS, Nama, Unit, Kelas, Kelompok, Angkatan</span>.</li>
+                            <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">Nama, Unit, Kelas, Kelompok, Angkatan</span> plus <span class="fw-bold">NIS</span> atau <span class="fw-bold">NODAFTAR</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Kolom opsional: <span class="fw-bold">Gender, Alamat, Ortu, NO_WA</span>.</li>
+                            <li class="list-group-item list-group-timeline-danger">Yang diimpor adalah <span class="fw-bold">sheet yang sedang aktif</span> saat file Excel disimpan (bukan selalu sheet paling kiri).</li>
                             <li class="list-group-item list-group-timeline-danger">Contoh file yang dapat diproses untuk import:
                                 <a class="btn btn-sm btn-outline-primary fw-bolder"
                                    href="{{asset('TEMPLATE MENU UPLOAD DATA SISWA.xlsx')}}?v=20260903"

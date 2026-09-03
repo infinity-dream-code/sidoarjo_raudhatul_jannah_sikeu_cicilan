@@ -9,6 +9,7 @@ use App\Models\mst_sekolah;
 use App\Models\mst_thn_aka;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
+use App\Support\ExcelImportSheet;
 use App\Support\InputSiswaProcedure;
 use App\Support\SchoolScope;
 use Carbon\Carbon;
@@ -18,7 +19,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
-use Maatwebsite\Excel\HeadingRowImport;
 use Maatwebsite\Excel\Validators\ValidationException;
 
 class ExportImportDataController extends Controller
@@ -160,23 +160,31 @@ class ExportImportDataController extends Controller
         $file = $request->fileImport;
 
         try {
-            $headingsData = (new HeadingRowImport)->toArray($file);
             $requiredColumns = [
                 'nama', 'unit', 'kelas', 'kelompok', 'angkatan',
             ];
-
             $conditionalColumns = ['nis', 'nodaftar'];
-            if (empty($headingsData) || !isset($headingsData[0][0])) throw new \Exception ('Tidak dapat membaca judul kolom dari file. Pastikan file memiliki header yang sesuai.');
-            $headings = $headingsData[0][0];
-            $headings = array_map('strtolower', $headings);
+            $sheet = ExcelImportSheet::pickBest(
+                $file->getRealPath(),
+                $requiredColumns,
+                ['nis', 'nodaftar'],
+                null,
+                true,
+            );
+
+            $headings = $sheet['headings'];
             $missingColumns = [];
-            $hasNis = in_array('nis', $headings);
-            $hasNodaftar = in_array('nodaftar', $headings);
+            $hasNis = in_array('nis', $headings, true);
+            $hasNodaftar = in_array('nodaftar', $headings, true);
 
             if (!$hasNis && !$hasNodaftar) {
                 $missingColumns[] = 'NIS / NODAFTAR';
             }
-            foreach ($requiredColumns as $column) if (!in_array($column, $headings)) $missingColumns[] = $column;
+            foreach ($requiredColumns as $column) {
+                if (!in_array($column, $headings, true)) {
+                    $missingColumns[] = $column;
+                }
+            }
 
             if (!empty($missingColumns)) {
                 $formattedMissingColumns = strtoupper(str_replace('_', ' ', implode(', ', $missingColumns)));
@@ -189,7 +197,7 @@ class ExportImportDataController extends Controller
             }
 
             Cache::forget($this->cacheKey);
-            Excel::import(new ImportDataSiswa(), $file);
+            Excel::import(new ImportDataSiswa($sheet['index']), $file);
 
             $data = Cache::get($this->cacheKey) ?? [];
             $invalidCount = collect($data)->where('status', 0)->count();
@@ -197,6 +205,12 @@ class ExportImportDataController extends Controller
             if ($invalidCount > 0) {
                 $message .= " ({$invalidCount} baris perlu diperbaiki, lihat kolom Keterangan)";
             }
+
+            Log::info('export_import_data.store.ok', [
+                'sheet_name' => $sheet['name'],
+                'sheet_index' => $sheet['index'],
+                'row_count' => count($data),
+            ]);
 
             return response()->json(['message' => $message, 'data' => $data], 200);
         } catch (ValidationException $e) {

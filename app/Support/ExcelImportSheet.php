@@ -7,16 +7,19 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 class ExcelImportSheet
 {
     /**
-     * Pilih 1 sheet untuk diimpor: yang paling banyak baris data asli,
-     * bukan sheet contoh template. Tie-break: sheet aktif, lalu sheet terakhir.
+     * Pilih 1 sheet untuk diimpor.
+     * Default: sheet dengan baris data terbanyak, tie-break sheet aktif lalu sheet terakhir.
+     * $preferActive: pakai sheet yang sedang dibuka di Excel jika headernya valid.
      *
+     * @param  string|array<int, string>  $idHeading
      * @return array{index: int, headings: array<int, string>, usable: int, name: string}
      */
     public static function pickBest(
         string $path,
         array $requiredHeadings,
-        string $idHeading,
+        string|array $idHeading,
         ?callable $skipId = null,
+        bool $preferActive = false,
     ): array {
         $reader = IOFactory::createReaderForFile($path);
         $reader->setReadDataOnly(true);
@@ -28,7 +31,10 @@ class ExcelImportSheet
                 static fn ($heading) => strtolower(trim((string) $heading)),
                 $requiredHeadings
             );
-            $idHeading = strtolower(trim($idHeading));
+            $idHeadings = array_values(array_filter(array_map(
+                static fn ($heading) => strtolower(trim((string) $heading)),
+                (array) $idHeading
+            )));
 
             $candidates = [];
             foreach ($spreadsheet->getAllSheets() as $index => $sheet) {
@@ -42,24 +48,32 @@ class ExcelImportSheet
                 }
 
                 $missing = array_values(array_diff($required, $headings));
-                $idCol = array_search($idHeading, $headings, true);
+                $idCols = [];
+                foreach ($idHeadings as $idName) {
+                    $col = array_search($idName, $headings, true);
+                    if ($col !== false) {
+                        $idCols[$idName] = $col;
+                    }
+                }
                 $usable = 0;
 
-                if ($missing === [] && $idCol !== false) {
+                if ($missing === [] && $idCols !== []) {
                     foreach (array_slice($rows, 1) as $row) {
                         if (!is_array($row)) {
                             continue;
                         }
 
-                        $id = self::normalizeId($row[$idCol] ?? null);
-                        if ($id === '' || strcasecmp($id, $idHeading) === 0) {
-                            continue;
+                        foreach ($idCols as $idName => $idCol) {
+                            $id = self::normalizeId($row[$idCol] ?? null);
+                            if ($id === '' || strcasecmp($id, $idName) === 0) {
+                                continue;
+                            }
+                            if ($skipId && $skipId($id)) {
+                                continue;
+                            }
+                            $usable++;
+                            break;
                         }
-                        if ($skipId && $skipId($id)) {
-                            continue;
-                        }
-
-                        $usable++;
                     }
                 }
 
@@ -70,18 +84,27 @@ class ExcelImportSheet
                     'missing' => $missing,
                     'usable' => $usable,
                     'isActive' => $index === $activeIndex,
+                    'hasIdColumn' => $idCols !== [],
                 ];
             }
 
             $valid = array_values(array_filter(
                 $candidates,
-                static fn (array $candidate) => $candidate['missing'] === []
+                static fn (array $candidate) => $candidate['missing'] === [] && $candidate['hasIdColumn']
             ));
 
             if ($valid === []) {
                 throw new \RuntimeException(
                     'Tidak dapat membaca judul kolom dari file. Pastikan file memiliki header yang sesuai.'
                 );
+            }
+
+            if ($preferActive) {
+                foreach ($valid as $candidate) {
+                    if ($candidate['isActive']) {
+                        return $candidate;
+                    }
+                }
             }
 
             usort($valid, static function (array $a, array $b) {

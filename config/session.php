@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\Str;
-
 return [
 
     /*
@@ -31,7 +29,7 @@ return [
     |
     */
 
-    'lifetime' => env('SESSION_LIFETIME', 120),
+    'lifetime' => (int) env('SESSION_LIFETIME', 1440),
 
     'expire_on_close' => false,
 
@@ -113,7 +111,7 @@ return [
     |
     */
 
-    'lottery' => [2, 100],
+    'lottery' => [2, 1000],
 
     /*
     |--------------------------------------------------------------------------
@@ -126,10 +124,7 @@ return [
     |
     */
 
-    'cookie' => env(
-        'SESSION_COOKIE',
-        Str::slug(env('APP_NAME', 'laravel'), '_').'_session'
-    ),
+    'cookie' => env('SESSION_COOKIE', 'sikeu_rj_session'),
 
     /*
     |--------------------------------------------------------------------------

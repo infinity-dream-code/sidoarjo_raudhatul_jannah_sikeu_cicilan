@@ -62,6 +62,7 @@ class ExportImportDataController extends Controller
             ['data' => 'gender', 'name' => 'Jenis Kelamin', 'searchable' => false, 'orderable' => false],
             ['data' => 'ortu', 'name' => 'Ortu / Wali', 'searchable' => false, 'orderable' => false],
             ['data' => 'alamat', 'name' => 'Alamat', 'searchable' => false, 'orderable' => false],
+            ['data' => 'no_wa', 'name' => 'No WA', 'searchable' => false, 'orderable' => false],
         ];
     }
 
@@ -131,6 +132,7 @@ class ExportImportDataController extends Controller
                 'gender' => $item['gender'] ?? null,
                 'ortu' => $item['ortu'] ?? $item['genus'] ?? null,
                 'alamat' => $item['alamat'] ?? null,
+                'no_wa' => $item['no_wa'] ?? null,
                 'status' => $item['status'] ?? 0,
                 'keterangan' => $item['keterangan'],
             ];
@@ -288,6 +290,8 @@ class ExportImportDataController extends Controller
                         $this->resolveOrtuForDb($item),
                     );
 
+                    $this->syncNoWa($item, 'NOCUST', $nis);
+
                     $saved++;
                 }
 
@@ -372,6 +376,7 @@ class ExportImportDataController extends Controller
                             'CODE03' => $kelas->id,
                             'DESC03' => $kelas->kelas,
                         ]);
+                        $this->syncNoWa($item, 'NOCUST', (string) $item['nis']);
                     }
                 }
             } elseif ($request->metode == '4') {
@@ -398,6 +403,7 @@ class ExportImportDataController extends Controller
                         $existingCust->update([
                             'NOCUST' => $item['nis'],
                         ]);
+                        $this->syncNoWa($item, 'NOCUST', (string) $item['nis']);
                     }
                 }
             }
@@ -456,8 +462,38 @@ class ExportImportDataController extends Controller
         $item['nodaftar'] = isset($item['nodaftar']) && $item['nodaftar'] !== '' && $item['nodaftar'] !== null
             ? (string) $item['nodaftar']
             : null;
+        $item['no_wa'] = $this->normalizeNoWa($item['no_wa'] ?? $item['nowa'] ?? null);
 
         return $item;
+    }
+
+    private function normalizeNoWa(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            $digits = preg_replace('/\D+/', '', sprintf('%.0f', $value));
+        } else {
+            $digits = preg_replace('/\D+/', '', trim((string) $value));
+        }
+
+        if ($digits === '' || strlen($digits) > 50) {
+            return null;
+        }
+
+        return $digits;
+    }
+
+    private function syncNoWa(array $item, string $column, string $lookup): void
+    {
+        $noWa = $this->normalizeNoWa($item['no_wa'] ?? null);
+        if ($noWa === null || $lookup === '') {
+            return;
+        }
+
+        scctcust::where($column, $lookup)->update(['NO_WA' => $noWa]);
     }
 
     /** Nama ortu/wali utama (kolom ortu / genus / ayah di Excel). */
@@ -534,6 +570,11 @@ class ExportImportDataController extends Controller
             'GENUS' => $this->resolveOrtuForDb($item),
             'LastUpdate' => Carbon::now(),
         ];
+
+        $noWa = $this->normalizeNoWa($item['no_wa'] ?? null);
+        if ($noWa !== null) {
+            $payload['NO_WA'] = $noWa;
+        }
 
         if ($existingCust) {
             $payload['NOCUST'] = $metodeByNodaftar ? ($item['nis'] ?? $existingCust->NOCUST) : $existingCust->NOCUST;

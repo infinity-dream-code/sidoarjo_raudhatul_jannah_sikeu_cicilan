@@ -365,9 +365,62 @@
     setInterval(updateClock, 1000);
 
     document.addEventListener('DOMContentLoaded', function () {
-        $.ajaxSetup({
-            headers: {
-                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        function applyCsrfToken(token) {
+            if (!token) {
+                return;
+            }
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) {
+                meta.setAttribute('content', token);
+            }
+            document.querySelectorAll('input[name="_token"]').forEach(function (input) {
+                input.value = token;
+            });
+            $.ajaxSetup({
+                headers: {
+                    'X-CSRF-TOKEN': token
+                }
+            });
+        }
+
+        applyCsrfToken($('meta[name="csrf-token"]').attr('content'));
+
+        const sessionPingUrl = @json(route('admin.session-ping'));
+        let sessionPingInFlight = false;
+
+        function pingSession() {
+            if (sessionPingInFlight || document.hidden) {
+                return;
+            }
+            sessionPingInFlight = true;
+            fetch(sessionPingUrl, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            }).then(function (response) {
+                if (response.status === 401 || response.redirected) {
+                    window.location.href = @json(route('login'));
+                    return null;
+                }
+                return response.ok ? response.json() : null;
+            }).then(function (payload) {
+                if (payload && payload.csrf) {
+                    applyCsrfToken(payload.csrf);
+                }
+            }).catch(function () {
+                // Jangan paksa logout jika jaringan putus sebentar.
+            }).finally(function () {
+                sessionPingInFlight = false;
+            });
+        }
+
+        setInterval(pingSession, 4 * 60 * 1000);
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') {
+                pingSession();
             }
         });
 

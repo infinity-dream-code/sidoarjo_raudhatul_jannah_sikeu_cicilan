@@ -18,6 +18,12 @@ Route::prefix("admin")
     ->middleware(["auth", "check.roles:admin"])
     ->group(function () {
         Route::get("/", [AdminController::class, "index"])->name("index");
+        Route::get("session-ping", function () {
+            return response()->json([
+                "ok" => true,
+                "csrf" => csrf_token(),
+            ]);
+        })->name("session-ping");
 
         Route::prefix("master-data")->name("master-data.")->group(function () {
             Route::get("get-logo", function (\Illuminate\Http\Request $request) {

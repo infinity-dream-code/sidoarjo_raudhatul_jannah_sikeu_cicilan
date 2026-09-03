@@ -48,6 +48,9 @@ class ImportDataSiswa implements WithMultipleSheets, ToCollection, WithHeadingRo
             $rowData['nis'] = $nis !== '' ? $nis : null;
             $rowData['nodaftar'] = $nodaftar !== '' ? $nodaftar : null;
             $rowData['ortu'] = trim((string) ($rowData['ortu'] ?? $rowData['genus'] ?? $rowData['ayah'] ?? '')) ?: null;
+            $rowData['no_wa'] = $this->normalizeNoWa(
+                $rowData['no_wa'] ?? $rowData['nowa'] ?? $rowData['no wa'] ?? $rowData['wa'] ?? null
+            );
 
             $parsedRows[] = $rowData;
         }
@@ -160,6 +163,25 @@ class ImportDataSiswa implements WithMultipleSheets, ToCollection, WithHeadingRo
         }
 
         return $current . ', ' . $message;
+    }
+
+    private function normalizeNoWa(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            $digits = preg_replace('/\D+/', '', sprintf('%.0f', $value));
+        } else {
+            $digits = preg_replace('/\D+/', '', trim((string) $value));
+        }
+
+        if ($digits === '' || strlen($digits) > 50) {
+            return null;
+        }
+
+        return $digits;
     }
 
     public function headingRow(): int

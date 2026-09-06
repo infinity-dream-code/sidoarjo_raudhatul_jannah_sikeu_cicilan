@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\mst_kelas;
 use App\Models\mst_sekolah;
 use App\Models\scctcust;
+use App\Models\SmUserCredentialLink;
 use App\Models\ValidationMessage;
 use App\Support\AndroidLogonFixerProcedure;
 use App\Support\FilterHandler;
@@ -115,6 +116,14 @@ class DataSiswaController extends Controller
                 "buttonText" => "Edit Status",
                 "buttonClass" => "btn btn-sm btn-warning button-set-status-siswa",
                 "buttonIcon" => "ri-edit-box-line me-2",
+            ],
+            [
+                "data" => "link_tagihan",
+                "name" => "Link Tagihan",
+                "searchable" => false,
+                "orderable" => false,
+                "exportable" => false,
+                "className" => "text-center",
             ],
         ];
     }
@@ -237,15 +246,46 @@ class DataSiswaController extends Controller
 
         $totalRecordsWithFilter = (clone $filteredQuery)->count("CUSTID");
 
-        $records = $filteredQuery
+        $pageRows = $filteredQuery
             ->orderBy($columnName, $columnSortOrder)
             ->skip($start)
             ->take($length)
             ->select($select)
-            ->get()
-            ->map(function ($item) {
+            ->get();
+
+        $normalizedByCustId = [];
+        $normalizedList = [];
+        foreach ($pageRows as $item) {
+            $normalized = SmUserCredentialLink::normalizeNoCust($item->rawNis());
+            if ($normalized === '') {
+                continue;
+            }
+            $normalizedByCustId[(int) $item->CUSTID] = $normalized;
+            $normalizedList[] = $normalized;
+        }
+
+        $activeLinks = collect();
+        if ($normalizedList !== []) {
+            try {
+                $activeLinks = SmUserCredentialLink::query()
+                    ->active()
+                    ->whereIn("no_cust", array_values(array_unique($normalizedList)))
+                    ->orderByDesc("id")
+                    ->get()
+                    ->unique("no_cust")
+                    ->keyBy("no_cust");
+            } catch (\Throwable $e) {
+                $activeLinks = collect();
+            }
+        }
+
+        $records = $pageRows->map(function ($item) use ($normalizedByCustId, $activeLinks) {
                 $row = $item->toArray();
+                $custId = (int) $item->CUSTID;
                 $nis = trim((string) ($item->nocust ?? ''));
+                $normalized = $normalizedByCustId[$custId] ?? '';
+                $hasNis = $normalized !== '';
+                $link = $hasNis ? ($activeLinks->get($normalized)) : null;
                 $row["item_id"] = $item->CUSTID;
                 $row["select_reset"] = '<input type="checkbox" class="form-check-input reset-android-row" value="' . e((string) $item->CUSTID) . '">';
                 $row["nis"] = $item->nocust;
@@ -261,6 +301,14 @@ class DataSiswaController extends Controller
                 $row["no_wa"] = $item->NO_WA;
                 $row["edit_siswa"] = true;
                 $row["set_status"] = true;
+                $row["link_tagihan"] = SmUserCredentialLink::tableCellHtml(
+                    $link,
+                    $custId,
+                    $hasNis,
+                    $item->NO_WA ?? null,
+                    (string) ($item->nmcust ?? ''),
+                    (string) ($item->nocust ?? $normalized),
+                );
                 unset($row["CUSTID"]);
 
                 return $row;
@@ -455,6 +503,107 @@ class DataSiswaController extends Controller
         }
 
         return response()->json(["message" => "Reset Android berhasil untuk {$processed} siswa."], 200);
+    }
+
+    public function buatLinkTagihan($id, Request $request)
+    {
+        return $this->createOrRenewLinkTagihan($id, false);
+    }
+
+    public function perbaruiLinkTagihan($id, Request $request)
+    {
+        return $this->createOrRenewLinkTagihan($id, true);
+    }
+
+    private function createOrRenewLinkTagihan($id, bool $forceRenew)
+    {
+        $siswa = scctcust::where("CUSTID", $id)->first();
+        if (!$siswa) {
+            return response()->json(["message" => "Siswa tidak ditemukan!"], 422);
+        }
+
+        $denied = SchoolScope::denyStudentMessage($siswa);
+        if ($denied) {
+            return response()->json(["message" => $denied], 403);
+        }
+
+        $noCust = SmUserCredentialLink::normalizeNoCust($siswa->rawNis());
+        if ($noCust === '') {
+            return response()->json(["message" => "Siswa tidak memiliki NIS!"], 422);
+        }
+
+        $user = Auth::user();
+        $createdBy = trim((string) ($user->users ?? ''));
+        if ($createdBy === '') {
+            $createdBy = (string) ($user->urut ?? $user->id ?? "admin");
+        }
+
+        try {
+            if (!$forceRenew) {
+                $existing = SmUserCredentialLink::query()
+                    ->active()
+                    ->where("no_cust", $noCust)
+                    ->orderByDesc("id")
+                    ->first();
+
+                if ($existing) {
+                    return response()->json([
+                        "message" => "Link tagihan masih aktif.",
+                        "url" => $existing->fullUrl(),
+                        "html" => SmUserCredentialLink::tableCellHtml(
+                            $existing,
+                            (int) $siswa->CUSTID,
+                            true,
+                            $siswa->NO_WA ?? null,
+                            (string) ($siswa->nmcust ?? ''),
+                            $noCust,
+                        ),
+                        "expires_at" => optional($existing->expires_at)->format("Y-m-d H:i:s"),
+                    ], 200);
+                }
+            } else {
+                SmUserCredentialLink::query()
+                    ->active()
+                    ->where("no_cust", $noCust)
+                    ->update(["used_at" => now()]);
+            }
+
+            $link = SmUserCredentialLink::query()->create([
+                "token" => SmUserCredentialLink::generateToken(),
+                "no_cust" => $noCust,
+                "custid" => $siswa->CUSTID,
+                "tahun_akademik" => "all",
+                "expires_at" => now()->addHours(24),
+                "used_at" => null,
+                "created_by" => $createdBy,
+            ]);
+
+            return response()->json([
+                "message" => $forceRenew
+                    ? "Link login tagihan berhasil diperbarui."
+                    : "Link login tagihan berhasil dibuat.",
+                "url" => $link->fullUrl(),
+                "html" => SmUserCredentialLink::tableCellHtml(
+                    $link,
+                    (int) $siswa->CUSTID,
+                    true,
+                    $siswa->NO_WA ?? null,
+                    (string) ($siswa->nmcust ?? ''),
+                    $noCust,
+                ),
+                "expires_at" => optional($link->expires_at)->format("Y-m-d H:i:s"),
+            ], 200);
+        } catch (\Throwable $e) {
+            $detail = $e->getMessage();
+
+            return response()->json(
+                [
+                    "message" => "Gagal " . ($forceRenew ? "memperbarui" : "membuat") . " link tagihan: {$detail}",
+                    "error" => $detail,
+                ],
+                422,
+            );
+        }
     }
 
     public function setStatusSiswa($id, Request $request)

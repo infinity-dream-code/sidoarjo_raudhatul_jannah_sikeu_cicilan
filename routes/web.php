@@ -85,6 +85,8 @@ Route::prefix("admin")
                     Route::get("get-siswa-select2", "getSiswaSelect2")->name("get-siswa-select2");
                     Route::post("reset-login-android/{id}", "ResetLoginAndroid")->name("reset-login-android");
                     Route::post("reset-login-android-bulk", "resetLoginAndroidBulk")->name("reset-login-android-bulk");
+                    Route::post("buat-link-tagihan/{id}", "buatLinkTagihan")->name("buat-link-tagihan");
+                    Route::post("perbarui-link-tagihan/{id}", "perbaruiLinkTagihan")->name("perbarui-link-tagihan");
                     Route::post("set-status-siswa/{id}", "setStatusSiswa")->name("set-status-siswa");
                 });
             Route::resource("data-siswa", \App\Http\Controllers\Admin\MasterData\DataSiswaController::class)->names("data-siswa");

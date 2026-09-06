@@ -74,5 +74,32 @@ class scctcust extends Model
         return ((int) $max) + 1;
     }
 
+    public function rawNis(): string
+    {
+        foreach ($this->getAttributes() as $name => $value) {
+            if (strcasecmp((string) $name, 'nocust') !== 0) {
+                continue;
+            }
+
+            $value = trim((string) $value);
+            if ($value !== '' && $value !== '-') {
+                return $value;
+            }
+        }
+
+        foreach ($this->getAttributes() as $name => $value) {
+            if (strcasecmp((string) $name, 'num2nd') !== 0) {
+                continue;
+            }
+
+            $value = trim((string) $value);
+            if ($value !== '' && $value !== '-') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
     protected $guarded = [];
 }

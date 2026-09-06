@@ -68,6 +68,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'url_web_tagihan' => env('APP_URL_WEB_TAGIHAN', 'https://tagihan-raudhatuljannah-sidoarjo.smartpayment.co.id'),
+
     'asset_url' => env('ASSET_URL'),
 
     /*

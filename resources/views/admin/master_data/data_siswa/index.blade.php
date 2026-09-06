@@ -10,6 +10,23 @@
             background-color: #fff3cd !important;
             border-color: #ffe69c !important;
         }
+        .link-tagihan-box {
+            min-width: 260px;
+            max-width: 340px;
+            padding: .35rem .5rem;
+            border: 1px solid #e7e7ff;
+            border-radius: .5rem;
+            background: #f8f8ff;
+        }
+        .link-tagihan-url {
+            font-size: .75rem;
+            color: #5a5a8a;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            cursor: pointer;
+        }
+        .link-tagihan-url:hover {
+            color: #696cff;
+        }
     </style>
 @endsection
 @section('content')
@@ -790,6 +807,136 @@
                     });
                 });
             }
+
+            document.getElementById(dtOptions.tableId).addEventListener('click', async function (e) {
+                const copyBtn = e.target.closest('.btn-copy-link-tagihan');
+                if (copyBtn) {
+                    const url = copyBtn.getAttribute('data-url') || '';
+                    if (!url) {
+                        errorAlert('Link tidak tersedia.');
+                        return;
+                    }
+                    try {
+                        await navigator.clipboard.writeText(url);
+                        successAlert('Link tagihan disalin.');
+                    } catch (err) {
+                        window.prompt('Salin link tagihan:', url);
+                    }
+                    return;
+                }
+
+                const waDisabled = e.target.closest('.btn-kirim-wa-link-tagihan-disabled');
+                if (waDisabled) {
+                    errorAlert('No WA orang tua belum diisi. Lengkapi No WA siswa dulu.');
+                    return;
+                }
+
+                const linkPreview = e.target.closest('.link-tagihan-url');
+                if (linkPreview) {
+                    const box = linkPreview.closest('.link-tagihan-box');
+                    const url = box?.querySelector('.btn-copy-link-tagihan')?.getAttribute('data-url') || '';
+                    if (!url) {
+                        errorAlert('Link tidak tersedia.');
+                        return;
+                    }
+                    Swal.fire({
+                        title: 'Link Tagihan',
+                        html: `<div class="text-start">
+                            <label class="form-label small mb-1">URL login otomatis</label>
+                            <input type="text" class="form-control form-control-sm" value="${url.replace(/"/g, '&quot;')}" readonly onclick="this.select()">
+                           </div>`,
+                        showCancelButton: true,
+                        confirmButtonText: 'Salin',
+                        cancelButtonText: 'Tutup',
+                        width: 560,
+                    }).then(async (result) => {
+                        if (!result.isConfirmed) return;
+                        try {
+                            await navigator.clipboard.writeText(url);
+                            successAlert('Link tagihan disalin.');
+                        } catch (err) {
+                            window.prompt('Salin link tagihan:', url);
+                        }
+                    });
+                    return;
+                }
+
+                const renewBtn = e.target.closest('.btn-perbarui-link-tagihan');
+                if (renewBtn) {
+                    const itemId = renewBtn.getAttribute('data-id');
+                    if (!itemId) {
+                        errorAlert('data tidak valid!');
+                        return;
+                    }
+
+                    const confirm = await Swal.fire({
+                        title: 'Perbarui Link?',
+                        text: 'Link lama akan diganti. Link baru berlaku 24 jam.',
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonText: 'Ya, Perbarui',
+                        cancelButtonText: 'Batal',
+                    });
+                    if (!confirm.isConfirmed) {
+                        return;
+                    }
+
+                    loadingAlert('Memperbarui link tagihan...');
+                    const renewUrl = '{{ url('admin/master-data/data-siswa/perbarui-link-tagihan') }}/' + encodeURIComponent(itemId);
+                    const renewRequest = new Request(renewUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                    });
+                    const renewResult = await submitForm(renewRequest);
+                    if (renewResult) {
+                        successAlert(renewResult.message ?? 'Link tagihan berhasil diperbarui.');
+                        if (renewResult.html) {
+                            const cell = renewBtn.closest('td');
+                            if (cell) {
+                                cell.innerHTML = renewResult.html;
+                                return;
+                            }
+                        }
+                        dataReload(dtOptions.tableId);
+                    }
+                    return;
+                }
+
+                const createBtn = e.target.closest('.btn-buat-link-tagihan');
+                if (!createBtn) {
+                    return;
+                }
+
+                const itemId = createBtn.getAttribute('data-id');
+                if (!itemId) {
+                    errorAlert('data tidak valid!');
+                    return;
+                }
+
+                loadingAlert('Membuat link tagihan...');
+                const url = '{{ url('admin/master-data/data-siswa/buat-link-tagihan') }}/' + encodeURIComponent(itemId);
+                const request = new Request(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                });
+
+                const processForm = await submitForm(request);
+                if (processForm) {
+                    successAlert(processForm.message ?? 'Link tagihan berhasil dibuat.');
+                    if (processForm.html) {
+                        const cell = createBtn.closest('td');
+                        if (cell) {
+                            cell.innerHTML = processForm.html;
+                            return;
+                        }
+                    }
+                    dataReload(dtOptions.tableId);
+                }
+            });
 
             document.getElementById(dtOptions.tableId).addEventListener('change', function (e) {
                 const rowCheckbox = e.target.closest('.reset-android-row');

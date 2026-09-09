@@ -154,6 +154,12 @@
                             <span class="badge bg-primary" id="periode_preview">-</span>
                         </div>
                     </div>
+                    <div class="col-md-6 col-xl-5">
+                        <label class="form-label" for="exp_date">Expired Date (ExpDate)</label>
+                        <input type="date" class="form-control" id="exp_date" name="exp_date"
+                               min="{{ date('Y-m-d') }}">
+                        <div class="form-text">Opsional. Batas waktu bayar tagihan (kolom ExpDate).</div>
+                    </div>
                 </div>
             </form>
         </div>

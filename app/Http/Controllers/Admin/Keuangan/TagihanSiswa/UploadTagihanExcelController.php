@@ -235,12 +235,16 @@ class UploadTagihanExcelController extends Controller
             'tagihan' => ['required'],
             'periode_tahun' => ['required', 'integer', 'digits:4', 'min:2000', 'max:2099'],
             'periode_bulan' => ['required', 'integer', 'min:1', 'max:12'],
+            'exp_date' => ['nullable', 'date'],
         ], ValidationMessage::messages(), ValidationMessage::attributes());
 
         $data = Cache::get($this->resolvedCacheKey());
         if (empty($data))return response()->json(['message' => 'Silahkan import data tagihan terlebih dahulu'], 422);
 
         $bta = sprintf('%04d%02d', (int) $request->periode_tahun, (int) $request->periode_bulan);
+        $expDate = $request->filled('exp_date')
+            ? date('Y-m-d 23:59:59', strtotime((string) $request->exp_date))
+            : null;
 
         $tagihan = mst_tagihan::where('urut', $request->tagihan)->first();
         if (!$tagihan) return response()->json(['message' => 'Tagihan tidak ditemukan, silahkan muat ulang halaman!'], 422);
@@ -283,6 +287,7 @@ class UploadTagihanExcelController extends Controller
                     'BILLCD' => $billCD,
                     'INSTALLMENT' => 0,
                     'isINSTALLABLE' => (int) ($tagihan->isINSTALLMENT ?? 0),
+                    'ExpDate' => $expDate,
                 ]);
                 $insertedCount++;
             }

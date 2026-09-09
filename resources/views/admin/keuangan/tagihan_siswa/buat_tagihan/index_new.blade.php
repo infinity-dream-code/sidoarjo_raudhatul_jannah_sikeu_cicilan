@@ -193,6 +193,19 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col order-6">
+                            <div class="row d-flex align-items-center">
+                                <div class="col-3">
+                                    <label class="form-label" for="exp_date">
+                                        Expired Date
+                                    </label>
+                                </div>
+                                <div class="col">
+                                    <input type="date" class="form-control" id="exp_date" name="exp_date"
+                                           min="{{ date('Y-m-d') }}">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </form>
 

@@ -41,6 +41,7 @@ class DataTagihanController extends Controller
         'angkatan' => 'scctcust.DESC04',
         'siswa' => 'scctcust.nmcust',
         'custid' => 'scctcust.CUSTID',
+        'expired' => 'scctbill.ExpDate',
     ];
 
     public function __construct()
@@ -94,6 +95,69 @@ class DataTagihanController extends Controller
         }
 
         return preg_match('/^0{4}-0{2}-0{2}/', $normalized) === 1;
+    }
+
+    private function formatExpDateDisplay(mixed $value): ?string
+    {
+        if ($this->isBlankPaidDate($value)) {
+            return null;
+        }
+
+        try {
+            $parsed = Carbon::parse($value);
+            if ($parsed->year < 1971) {
+                return null;
+            }
+
+            return $parsed->format('d-m-Y');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function formatExpDateRaw(mixed $value): ?string
+    {
+        if ($this->isBlankPaidDate($value)) {
+            return null;
+        }
+
+        try {
+            $parsed = Carbon::parse($value);
+            if ($parsed->year < 1971) {
+                return null;
+            }
+
+            return $parsed->format('Y-m-d H:i:s');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function isExpired(mixed $expDate): bool
+    {
+        if ($this->isBlankPaidDate($expDate)) {
+            return false;
+        }
+
+        try {
+            return Carbon::parse($expDate)->lt(Carbon::now());
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Otomatis: tgl 20 bulan ini (jika hari <= 20), atau tgl 20 bulan depan (jika hari > 20).
+     */
+    public static function resolveAutoExtendExpDate(?Carbon $from = null): Carbon
+    {
+        $from = ($from ?? Carbon::now())->copy()->startOfDay();
+
+        if ($from->day <= 20) {
+            return $from->copy()->day(20)->endOfDay();
+        }
+
+        return $from->copy()->addMonthNoOverflow()->day(20)->endOfDay();
     }
 
     private function resolvePaidDateDisplay(mixed $paidDtRaw, int $billPaid, ?string $aa = null, array $lastPaymentDates = []): ?string
@@ -155,12 +219,29 @@ class DataTagihanController extends Controller
             ['data' => 'BILLPAID', 'name' => 'Jumlah Terbayar', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end', 'exportable' => true],
             ['data' => 'PAIDDT', 'name' => 'Tanggal Bayar', 'searchable' => true, 'orderable' => true, 'columnType' => 'timestamp', 'exportable' => true],
             ['data' => 'BILLAC', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'exportable' => true],
+            ['data' => 'ExpDate', 'name' => 'Expired Date', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             [
                 'data' => 'FUrutan',
                 'name' => 'Urutan',
                 'searchable' => true,
                 'orderable' => true,
                 'exportable' => true,
+                'duplicate' => false,
+            ],
+            [
+                'data' => 'perpanjang',
+                'name' => 'Perpanjang',
+                'orderable' => false,
+                'dataVal' => false,
+                'columnType' => 'button',
+                'className' => 'text-center exclude-selection',
+                'excludeFromSelection' => true,
+                'button' => 'action',
+                'buttonText' => 'Perpanjang',
+                'buttonClass' => 'btn btn-sm btn-info btn-perpanjang-exp',
+                'buttonLink' => '#modal-perpanjang-exp',
+                'buttonIcon' => 'ri-calendar-schedule-line me-2',
+                'exportable' => false,
                 'duplicate' => false,
             ],
             [
@@ -245,6 +326,8 @@ class DataTagihanController extends Controller
             ->orderByRaw("CASE WHEN kelas REGEXP '^[0-9]+$' THEN 0 ELSE 1 END, kelas")
             ->get();
         $data['tanda_tangan'] = User::getTandaTanganBase64();
+        $data['autoExpDate'] = self::resolveAutoExtendExpDate()->format('Y-m-d');
+        $data['autoExpDateLabel'] = self::resolveAutoExtendExpDate()->translatedFormat('d F Y');
 
         return view('admin.keuangan.tagihan_siswa.data_tagihan', $data);
     }
@@ -329,6 +412,91 @@ class DataTagihanController extends Controller
 
             return response()->json([
                 'message' => 'Gagal mengubah urutan tagihan: ' . $e->getMessage(),
+                'error' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function perpanjangExp(Request $request)
+    {
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'ids' => ['required', 'array', 'min:1'],
+                'ids.*' => ['required'],
+                'mode' => ['required', 'in:auto,custom'],
+                'exp_date' => ['nullable', 'date', 'required_if:mode,custom'],
+            ],
+            ValidationMessage::messages(),
+            [
+                'ids' => 'Tagihan',
+                'mode' => 'Mode perpanjang',
+                'exp_date' => 'Tanggal expired',
+            ]
+        );
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'error' => $validator->errors(),
+            ], 422);
+        }
+
+        $ids = collect($request->input('ids', []))
+            ->map(fn ($id) => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($ids === []) {
+            return response()->json(['message' => 'Pilih minimal 1 tagihan.'], 422);
+        }
+
+        if ($request->input('mode') === 'auto') {
+            $newExp = self::resolveAutoExtendExpDate();
+        } else {
+            try {
+                $newExp = Carbon::parse($request->input('exp_date'))->endOfDay();
+            } catch (\Throwable) {
+                return response()->json(['message' => 'Tanggal expired tidak valid.'], 422);
+            }
+        }
+
+        $query = scctbill::query()
+            ->whereIn('AA', $ids)
+            ->where('FSTSBolehBayar', 1);
+
+        $this->applyBelumLunasScope($query);
+
+        $tagihans = $query->get();
+        if ($tagihans->isEmpty()) {
+            return response()->json(['message' => 'Tagihan tidak ditemukan atau sudah lunas.'], 422);
+        }
+
+        try {
+            DB::connection('DATA_MYSQL')->beginTransaction();
+
+            $updated = 0;
+            foreach ($tagihans as $tagihan) {
+                $tagihan->ExpDate = $newExp->format('Y-m-d H:i:s');
+                $tagihan->save();
+                $updated++;
+            }
+
+            Cache::increment(Str::slug($this->cacheKey) . '_cache_version');
+            DB::connection('DATA_MYSQL')->commit();
+
+            return response()->json([
+                'message' => "Berhasil memperpanjang {$updated} tagihan sampai {$newExp->translatedFormat('d F Y')}.",
+                'exp_date' => $newExp->format('Y-m-d H:i:s'),
+                'updated' => $updated,
+            ], 200);
+        } catch (\Throwable $e) {
+            DB::connection('DATA_MYSQL')->rollBack();
+
+            return response()->json([
+                'message' => 'Gagal memperpanjang expired date: ' . $e->getMessage(),
                 'error' => $e->getMessage(),
             ], 422);
         }
@@ -596,7 +764,7 @@ class DataTagihanController extends Controller
         $columnName = 'scctbill.FUrutan';
         $columnSortOrder = 'asc';
         $userOrdered = false;
-        $nonSortableData = ['AA', 'naik', 'turun', 'delete', 'hapus', 'print', 'NOVA', 'detail_trx', 'kirim_wa'];
+        $nonSortableData = ['AA', 'naik', 'turun', 'delete', 'hapus', 'print', 'NOVA', 'detail_trx', 'kirim_wa', 'perpanjang'];
 
         if (!empty($order_arr)) {
             $columnIndex = $columnIndex_arr[0]['column'] ?? null;
@@ -623,6 +791,7 @@ class DataTagihanController extends Controller
             'BILLAC' => 'scctbill.BILLAC',
             'FUrutan' => 'scctbill.FUrutan',
             'PAIDDT' => 'scctbill.PAIDDT',
+            'ExpDate' => 'scctbill.ExpDate',
             'NOCUST' => 'scctcust.nocust',
             'NUM2ND' => 'scctcust.NUM2ND',
             'NMCUST' => 'scctcust.nmcust',
@@ -664,6 +833,7 @@ class DataTagihanController extends Controller
             'scctbill.PAYMENTLEFT',
             'scctbill.PAIDST',
             'scctbill.PAIDDT',
+            'scctbill.ExpDate',
             'scctbill.INSTALLMENT',
             'scctbill.TRANSNO as BILL_TRANSNO',
             'scctbill.BTA',
@@ -777,6 +947,8 @@ class DataTagihanController extends Controller
                 $billPaid = (int) ($get('BILLPAID') ?? 0);
                 $paidDtRaw = $get('PAIDDT');
                 $paidDtDisplay = $this->resolvePaidDateDisplay($paidDtRaw, $billPaid, $aa, $lastPaymentDates);
+                $expDateDisplay = $this->formatExpDateDisplay($get('ExpDate'));
+                $isExpired = $this->isExpired($get('ExpDate'));
                 $noVa = ($nocust && $nocust !== '-') ? scctcust::showVA($nocust) : null;
                 $kelasLabel = trim((string) ($get('DESC02') ?? '') . ' ' . (string) ($get('DESC03') ?? ''));
                 $noWa = $get('NO_WA');
@@ -822,6 +994,9 @@ class DataTagihanController extends Controller
                     'INSTALLMENT' => (int) ($get('INSTALLMENT') ?? 0),
                     'PAIDDT' => $paidDtDisplay,
                     'PAIDDT_ISO' => $paidDtDisplay,
+                    'ExpDate' => $expDateDisplay,
+                    'ExpDate_raw' => $this->formatExpDateRaw($get('ExpDate')),
+                    'is_expired' => $isExpired,
                     'FIDBANK' => $get('FIDBANK'),
                     'FUrutan' => ($furutan === null || $furutan === '')
                         ? '0'
@@ -830,6 +1005,7 @@ class DataTagihanController extends Controller
                     'TRX_LOGS' => [],
                     'BILL_TRANSNO' => $get('BILL_TRANSNO'),
                     'print' => true,
+                    'perpanjang' => true,
                     'kirim_wa' => $waUrl !== null,
                     'wa_url' => $waUrl,
                     'delete' => $billPaid > 0,
@@ -1152,6 +1328,14 @@ class DataTagihanController extends Controller
                     break;
                 case 'scctbill.BILLAC':
                     $filters[] = ['scctbill.BILLAC', '=', trim((string) $val)];
+                    break;
+                case 'scctbill.ExpDate':
+                    $expiredFlag = strtolower(trim((string) $val));
+                    if (in_array($expiredFlag, ['1', 'yes', 'expired', 'sudah'], true)) {
+                        $filters[] = ['whereRaw', 'scctbill.ExpDate IS NOT NULL AND scctbill.ExpDate < NOW()', []];
+                    } elseif (in_array($expiredFlag, ['0', 'no', 'belum', 'aktif'], true)) {
+                        $filters[] = ['whereRaw', '(scctbill.ExpDate IS NULL OR scctbill.ExpDate >= NOW())', []];
+                    }
                     break;
                 case 'scctcust.DESC02':
                     $delimiter = str_contains((string) $val, '~~') ? '~~' : '~~';

@@ -8,6 +8,12 @@ Auth::routes([
     "register" => false,
 ]);
 Route::get("/", [AuthController::class, "index"])->name("index");
+Route::get('/cara-bayar/{token}', [\App\Http\Controllers\CaraBayarController::class, 'show'])
+    ->where('token', '[A-Fa-f0-9]{64}')
+    ->name('cara-bayar.show');
+Route::get('/cara-bayar/{token}/pdf', [\App\Http\Controllers\CaraBayarController::class, 'pdf'])
+    ->where('token', '[A-Fa-f0-9]{64}')
+    ->name('cara-bayar.pdf');
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 Route::get("/reload-captcha", [AuthController::class, "reloadCaptcha"])->name("reload-captcha");
@@ -143,6 +149,7 @@ Route::prefix("admin")
                         Route::get("get-trans-log/{id}", "getTransLog")->name("get-trans-log");
                         Route::get("cetak-rekap", "cetak")->name("cetak-rekap");
                         Route::post("ubah-urutan/{id}", "ubahUrutan")->name("ubah-urutan");
+                        Route::post("perpanjang-exp", "perpanjangExp")->name("perpanjang-exp");
                         Route::delete("hapus/{id}", "hapusTagihan")->name("hapus");
                         Route::get("cetak-kartu-siswa", "cetakKartuSiswa")->name("cetak-kartu-siswa");
                         Route::resource("", \App\Http\Controllers\Admin\Keuangan\TagihanSiswa\DataTagihanController::class)->parameters(["" => "id"]);
@@ -157,6 +164,25 @@ Route::prefix("admin")
                         Route::resource("", \App\Http\Controllers\Admin\Keuangan\TagihanSiswa\UploadTagihanExcelController::class)->parameters(["" => "id"]);
                     });
                 });
+
+                Route::prefix("perpanjang-expired")
+                    ->name("perpanjang-expired.")
+                    ->controller(\App\Http\Controllers\Admin\Keuangan\TagihanSiswa\PerpanjangExpiredController::class)
+                    ->group(function () {
+                        Route::get("", "index")->name("index");
+                        Route::get("get-data", "getData")->name("get-data");
+                        Route::post("store", "store")->name("store");
+                    });
+
+                Route::prefix("aktifasi-pembayaran-bank")
+                    ->name("aktifasi-pembayaran-bank.")
+                    ->controller(\App\Http\Controllers\Admin\Keuangan\TagihanSiswa\AktifasiPembayaranBankController::class)
+                    ->group(function () {
+                        Route::get("", "index")->name("index");
+                        Route::get("tagihan/{custid}", "tagihan")->name("tagihan");
+                        Route::post("generate", "generate")->name("generate");
+                        Route::get("pdf/{id}", "pdf")->name("pdf");
+                    });
             });
 
             Route::prefix("penerimaan-siswa")->name("penerimaan-siswa.")->group(function () {

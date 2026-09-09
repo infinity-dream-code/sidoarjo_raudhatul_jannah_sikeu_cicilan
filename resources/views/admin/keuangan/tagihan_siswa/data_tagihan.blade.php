@@ -83,6 +83,50 @@
             color: #a1acb8;
             font-size: 0.9rem;
         }
+
+        tr.tagihan-expired-row > td {
+            background-color: #fff2f0 !important;
+        }
+
+        tr.tagihan-expired-row > td:first-child {
+            box-shadow: inset 3px 0 0 #ff3e1d;
+        }
+
+        .badge-expired {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-left: 0.35rem;
+            vertical-align: middle;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        /* Jaga header/body DataTables scrollX tetap sejajar */
+        .dt-tagihan-wrap div.dataTables_scrollHead,
+        .dt-tagihan-wrap div.dataTables_scrollBody,
+        .dt-tagihan-wrap div.dataTables_scrollFoot {
+            width: 100% !important;
+        }
+
+        .dt-tagihan-wrap div.dataTables_scrollHead table,
+        .dt-tagihan-wrap div.dataTables_scrollBody table,
+        .dt-tagihan-wrap div.dataTables_scrollFoot table {
+            width: 100% !important;
+            margin: 0 !important;
+        }
+
+        .dt-tagihan-wrap #main_table th,
+        .dt-tagihan-wrap #main_table td {
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        .dt-tagihan-wrap #main_table td .btn {
+            white-space: nowrap;
+        }
     </style>
 @endsection
 @section('content')
@@ -158,6 +202,19 @@
                                 </select>
                             </div>
                             <div class="mb-5">
+                                <label class="form-label" for="filter_expired">
+                                    Status Expired
+                                </label>
+                                <select class="form-select" id="filter_expired"
+                                        name="filter[expired]"
+                                        data-control="select2"
+                                        data-placeholder="Status Expired">
+                                    <option value="all">Semua</option>
+                                    <option value="1">Sudah Expired</option>
+                                    <option value="0">Belum Expired</option>
+                                </select>
+                            </div>
+                            <div class="mb-5">
                                 <label class="form-label" for="post">
                                     Nama Tagihan
                                 </label>
@@ -226,6 +283,14 @@
                     </div>
                     <div class="row">
                         <div class="d-flex justify-content-center flex-column flex-md-row justify-content-md-end gap-4">
+                            <button type="button" class="btn btn-warning" id="btn-lihat-expired">
+                                <span class="ri-alarm-warning-line me-2"></span>
+                                Lihat Tagihan Expired
+                            </button>
+                            <a href="{{ route('admin.keuangan.tagihan-siswa.perpanjang-expired.index') }}" class="btn btn-info" id="btn-perpanjang-bulk">
+                                <span class="ri-calendar-schedule-line me-2"></span>
+                                Perpanjang Expired
+                            </a>
                             <button type="button" class="btn btn-facebook" id="cetak-kartu-siswa">
                                 <span class="ri-info-card-line me-2"></span>
                                 Cetak Kartu Siswa
@@ -247,7 +312,7 @@
                 </fieldset>
             </form>
         </div>
-        <div class="card-datatable table-responsive text-nowrap">
+        <div class="card-datatable text-nowrap dt-tagihan-wrap">
             <div id="tagihan-urutan-toolbar" class="d-none">
                 <button type="button" id="btn-naik-toolbar" class="btn btn-outline-primary me-2" disabled>
                     <span class="ri-arrow-up-line me-1"></span>Naikkan
@@ -256,7 +321,7 @@
                     <span class="ri-arrow-down-line me-1"></span>Turunkan
                 </button>
             </div>
-            <table class="table table-sm table-bordered table-hover"
+            <table class="table table-sm table-bordered table-hover w-100"
                    id="main_table">
                 <thead class="table-light">
 
@@ -410,6 +475,66 @@
         </div>
     </form>
 
+    <form id="form-perpanjang-exp" class="mainForm">
+        <div class="modal modal-blur fade" id="modal-perpanjang-exp" tabindex="-1" role="dialog" aria-hidden="true"
+             data-bs-backdrop="static">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-status bg-info"></div>
+                    <div class="modal-header">
+                        <div class="modal-title">Perpanjang Expired Date</div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body py-4">
+                        <div class="alert alert-info mb-3" role="alert">
+                            <div class="fw-semibold mb-1">Jumlah tagihan: <span id="perpanjang-count">0</span></div>
+                            <div class="small mb-0" id="perpanjang-preview-list"></div>
+                        </div>
+                        <fieldset class="form-fieldset">
+                            <div class="mb-3">
+                                <label class="form-label">Mode Perpanjang</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="mode" id="mode-auto" value="auto" checked>
+                                    <label class="form-check-label" for="mode-auto">
+                                        Otomatis tanggal 20
+                                        <span class="text-muted d-block small">
+                                            Hari ini ≤ 20 → tgl 20 bulan ini; hari ini &gt; 20 → tgl 20 bulan depan.
+                                            Target: <strong id="auto-exp-label">{{ $autoExpDateLabel ?? '-' }}</strong>
+                                        </span>
+                                    </label>
+                                </div>
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="radio" name="mode" id="mode-custom" value="custom">
+                                    <label class="form-check-label" for="mode-custom">
+                                        Set tanggal sendiri
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mb-3" id="custom-exp-wrap" style="display:none;">
+                                <label class="form-label" for="custom_exp_date">Tanggal Expired Baru</label>
+                                <input type="date" class="form-control" id="custom_exp_date" name="exp_date"
+                                       value="{{ $autoExpDate ?? '' }}">
+                            </div>
+                        </fieldset>
+                        <input type="hidden" id="perpanjang_ids" name="ids" value="">
+                    </div>
+                    <div class="modal-footer">
+                        <div class="w-100">
+                            <div class="row">
+                                <div class="col">
+                                    <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">Batal</button>
+                                </div>
+                                <div class="col">
+                                    <button type="submit" class="btn btn-info w-100">Simpan Perpanjang</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
     <form id="form-ubah-urutan" class="mainForm">
         <div class="modal modal-blur fade" id="modal-ubah-urutan" tabindex="-1" role="dialog" aria-hidden="true"
              data-bs-backdrop="static">
@@ -500,7 +625,7 @@
             prefetchedColumns: @json($tableColumns ?? []),
         };
     </script>
-    <script src="{{asset('js/data-tagihan-init.js')}}?v=20260724-excel-total"></script>
+    <script src="{{asset('js/data-tagihan-init.js')}}?v=20260907-expired"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
 
@@ -538,7 +663,7 @@
             thead: true,
             tfoot: true,
             scrollX: true,
-            order: [[15, 'asc']],
+            order: [[16, 'asc']],
             paging: true,
             searching: true,
             fixedHeader: false,
@@ -583,6 +708,12 @@
             });
             $(`#${dtOptions.tableId}`).on('draw.dt', function () {
                 closeAllTransLogRows();
+                markExpiredRows();
+            });
+            $(window).on('resize.dtTagihan', function () {
+                if (DT[`${dtOptions.tableId}`]) {
+                    DT[`${dtOptions.tableId}`].columns.adjust();
+                }
             });
             if (dtOptions.formId) {
                 let filterForm = $(`#${dtOptions.formId}`);
@@ -609,9 +740,12 @@
         const modalDelete = new bootstrap.Modal(document.getElementById('modal-delete'));
         const modalHapusElement = document.getElementById('modal-hapus');
         const modalHapus = new bootstrap.Modal(document.getElementById('modal-hapus'));
-
         const modalUrutElement = document.getElementById('modal-ubah-urutan');
         const modalUrut = new bootstrap.Modal(document.getElementById('modal-ubah-urutan'));
+        const modalPerpanjangElement = document.getElementById('modal-perpanjang-exp');
+        const modalPerpanjang = new bootstrap.Modal(modalPerpanjangElement);
+        const AUTO_EXP_DATE = @json($autoExpDate ?? '');
+        let perpanjangSelectedIds = [];
 
         modalDeleteElement.addEventListener('hide.bs.modal', function () {
             const form = document.getElementById('form-delete');
@@ -622,6 +756,93 @@
             const form = document.getElementById('form-hapus');
             form.reset();
         });
+
+        modalPerpanjangElement.addEventListener('hide.bs.modal', function () {
+            perpanjangSelectedIds = [];
+            document.getElementById('form-perpanjang-exp').reset();
+            document.getElementById('mode-auto').checked = true;
+            document.getElementById('custom-exp-wrap').style.display = 'none';
+            if (AUTO_EXP_DATE) {
+                document.getElementById('custom_exp_date').value = AUTO_EXP_DATE;
+            }
+        });
+
+        document.querySelectorAll('input[name="mode"]').forEach((el) => {
+            el.addEventListener('change', function () {
+                document.getElementById('custom-exp-wrap').style.display =
+                    this.value === 'custom' ? '' : 'none';
+            });
+        });
+
+        function openPerpanjangModal(rows) {
+            const list = (rows || []).filter((r) => r && (r.item_id || r.AA));
+            if (!list.length) {
+                warningAlert('Pilih minimal 1 tagihan untuk diperpanjang.');
+                return;
+            }
+
+            perpanjangSelectedIds = list.map((r) => String(r.item_id ?? r.AA));
+            document.getElementById('perpanjang-count').textContent = String(list.length);
+
+            const preview = list.slice(0, 8).map((r) => {
+                const nama = r.NMCUST || '-';
+                const bill = r.BILLNM || '-';
+                const raw = r.ExpDate_raw || r.ExpDate;
+                let exp = '-';
+                if (raw) {
+                    const parsed = new Date(String(raw).includes('-') && String(raw).indexOf('-') === 4
+                        ? raw
+                        : String(raw).split('-').reverse().join('-'));
+                    exp = Number.isNaN(parsed.getTime())
+                        ? String(r.ExpDate || '-')
+                        : parsed.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                }
+                return `${nama} — ${bill} (exp: ${exp})`;
+            });
+            const more = list.length > 8 ? `<div class="text-muted">+${list.length - 8} tagihan lainnya</div>` : '';
+            document.getElementById('perpanjang-preview-list').innerHTML =
+                preview.map((t) => `<div>${t}</div>`).join('') + more;
+
+            document.getElementById('mode-auto').checked = true;
+            document.getElementById('custom-exp-wrap').style.display = 'none';
+            if (AUTO_EXP_DATE) {
+                document.getElementById('custom_exp_date').value = AUTO_EXP_DATE;
+            }
+            modalPerpanjang.show();
+        }
+
+        function markExpiredRows() {
+            const dt = DT[`${dtOptions.tableId}`];
+            if (!dt) return;
+
+            const colIdx = dt.settings()[0].aoColumns.findIndex((c) => c.data === 'ExpDate');
+
+            dt.rows({ page: 'current' }).every(function () {
+                const data = this.data() || {};
+                const $row = $(this.node());
+                const expired = !!data.is_expired;
+
+                $row.toggleClass('tagihan-expired-row', expired);
+
+                if (colIdx < 0) {
+                    return;
+                }
+
+                const $cell = $row.children('td').eq(colIdx);
+                const label = data.ExpDate ? String(data.ExpDate) : '-';
+                const badge = expired
+                    ? ' <span class="badge bg-danger badge-expired"><i class="ri-alarm-warning-line"></i> EXPIRED</span>'
+                    : '';
+                $cell.html(label + badge);
+            });
+
+            // Samakan lebar header & body setelah konten sel berubah
+            try {
+                dt.columns.adjust();
+            } catch (e) {
+                // ignore
+            }
+        }
 
         function fillFormValue(id, rowEl) {
             const rowData = DT[`${dtOptions.tableId}`].row(rowEl).data();
@@ -846,6 +1067,72 @@
                 }
                 window.open(rowData.wa_url, '_blank');
             }
+            if (e.target.closest('.btn-perpanjang-exp')) {
+                const rowEl = e.target.closest('tr');
+                if (!rowEl) return;
+                const rowData = DT[`${dtOptions.tableId}`].row(rowEl).data();
+                if (!rowData) {
+                    warningAlert('Data baris tidak ditemukan.');
+                    return;
+                }
+                openPerpanjangModal([rowData]);
+            }
+        });
+
+        document.getElementById('btn-lihat-expired')?.addEventListener('click', function () {
+            const $expired = $('#filter_expired');
+            $expired.val('1').trigger('change');
+            dataReFilter(dtOptions.tableId);
+        });
+
+        // Tombol Perpanjang Expired di form filter sekarang link ke halaman khusus.
+
+        document.getElementById('form-perpanjang-exp')?.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (!perpanjangSelectedIds.length) {
+                warningAlert('Tidak ada tagihan yang dipilih.');
+                return;
+            }
+
+            const mode = document.querySelector('input[name="mode"]:checked')?.value || 'auto';
+            const payload = {
+                ids: perpanjangSelectedIds,
+                mode: mode,
+            };
+            if (mode === 'custom') {
+                const expDate = document.getElementById('custom_exp_date').value;
+                if (!expDate) {
+                    warningAlert('Isi tanggal expired baru.');
+                    return;
+                }
+                payload.exp_date = expDate;
+            }
+
+            loadingAlert('Memperpanjang expired date...');
+            fetch(@json(route('admin.keuangan.tagihan-siswa.data-tagihan.perpanjang-exp')), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify(payload),
+            })
+                .then(async (response) => {
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw { status: response.status, message: data.message || response.statusText };
+                    }
+                    return data;
+                })
+                .then((data) => {
+                    modalPerpanjang.hide();
+                    dataReload(dtOptions.tableId);
+                    successAlert(data.message || 'Expired date berhasil diperpanjang.');
+                })
+                .catch((error) => {
+                    errorAlert(error.message || 'Gagal memperpanjang expired date.');
+                });
         });
 
         $(document).on('click', '#main_table tbody .btn-detail-trx', async function (e) {
@@ -874,6 +1161,7 @@
         window.syncTagihanCheckboxSelection = syncTagihanCheckboxSelection;
         window.updateUrutanToolbarState = updateUrutanToolbarState;
         window.closeAllTransLogRows = closeAllTransLogRows;
+        window.markExpiredRows = markExpiredRows;
 
         async function toggleTransLogRow($rowEl, rowData, buttonEl) {
             const billId = rowData.item_id ?? rowData.AA;

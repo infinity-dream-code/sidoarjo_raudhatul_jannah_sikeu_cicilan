@@ -39,7 +39,7 @@
             thead: true,
             tfoot: true,
             scrollX: true,
-            order: [[15, 'asc']],
+            order: [[16, 'asc']],
             paging: true,
             searching: true,
             fixedHeader: false,
@@ -73,6 +73,9 @@
         $('#main_table').on('draw.dt', function () {
             if (typeof window.closeAllTransLogRows === 'function') {
                 window.closeAllTransLogRows();
+            }
+            if (typeof window.markExpiredRows === 'function') {
+                window.markExpiredRows();
             }
         });
 

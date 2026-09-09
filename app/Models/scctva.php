@@ -51,4 +51,62 @@ class scctva extends Model
 
         return $updated;
     }
+
+    public static function generateShareToken(): string
+    {
+        return bin2hex(random_bytes(32));
+    }
+
+    public function shareUrl(): ?string
+    {
+        $token = trim((string) ($this->SHARE_TOKEN ?? ''));
+        if ($token === '') {
+            return null;
+        }
+
+        return route('cara-bayar.show', ['token' => $token]);
+    }
+
+    public function displayNova(): string
+    {
+        $nis = trim((string) ($this->NOCUST ?? $this->NOVA ?? ''));
+        if ($nis === '' || $nis === '-') {
+            return '';
+        }
+
+        return scctcust::showVA($nis);
+    }
+
+    /**
+     * @return array<int, array{aa:int, nama:string, amount:int}>
+     */
+    public function parsedItems(): array
+    {
+        $aas = array_values(array_filter(array_map('trim', explode(',', (string) ($this->ArrayTagihan ?? '')))));
+        $amounts = array_values(array_filter(array_map('trim', explode(',', (string) ($this->BILLAM ?? ''))), 'strlen'));
+
+        $items = [];
+        foreach ($aas as $i => $aa) {
+            $items[] = [
+                'aa' => (int) $aa,
+                'nama' => '',
+                'amount' => (int) ($amounts[$i] ?? 0),
+            ];
+        }
+
+        if ($items === []) {
+            return [];
+        }
+
+        $names = scctbill::query()
+            ->whereIn('AA', array_column($items, 'aa'))
+            ->pluck('BILLNM', 'AA');
+
+        foreach ($items as &$item) {
+            $item['nama'] = (string) ($names[$item['aa']] ?? ('Tagihan #' . $item['aa']));
+        }
+        unset($item);
+
+        return $items;
+    }
 }

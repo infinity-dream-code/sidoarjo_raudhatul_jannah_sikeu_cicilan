@@ -256,8 +256,10 @@ class BuatTagihanController extends Controller
             'tagihan' => ['required', 'array', 'min:1'],
             'tagihan.*.tagihan' => ['required'],
             'tagihan.*.nominal' => ['required', 'regex:/^[0-9]+(\.[0-9]{3})*$/', 'not_in:0'],
+            'exp_date' => ['nullable', 'date'],
         ], ValidationMessage::messages(), array_merge(ValidationMessage::attributes(), [
             'nama_tagihan' => 'Nama Tagihan',
+            'exp_date' => 'Expired Date',
         ]));
 
         $tahun_angkatan = mst_thn_aka::where('thn_aka', $request->tahun_angkatan)->value('thn_aka');
@@ -309,6 +311,9 @@ class BuatTagihanController extends Controller
             if ($siswas->isEmpty()) return response()->json(['message' => 'Siswa tidak ditemukan'], 422);
             if (count($request->input('siswa')) != $siswas->count()) return response()->json(['message' => 'Jumlah siswa yang dipilih tidak sesuai dengan jumlah data, silahkan muat ulang halaman!'], 422);
 
+            $expDate = $request->filled('exp_date')
+                ? date('Y-m-d 23:59:59', strtotime((string) $request->exp_date))
+                : null;
 
             foreach ($siswas as $siswa) {
                 $tagihanSiswaTerbaru = scctbill::where('CUSTID', $siswa->CUSTID)
@@ -343,7 +348,13 @@ class BuatTagihanController extends Controller
                         'FTGLTagihan' => now(),
                         'FSTSBolehBayar' => 1,
                         'BTA' => $tahun_pelajaran_bta,
+                        'ExpDate' => $expDate,
                     ]);
+
+                    if ($expDate && empty($bill->ExpDate)) {
+                        $bill->ExpDate = $expDate;
+                        $bill->save();
+                    }
 
                     $bill->increment('BILLAM', (int) $nominal);
 

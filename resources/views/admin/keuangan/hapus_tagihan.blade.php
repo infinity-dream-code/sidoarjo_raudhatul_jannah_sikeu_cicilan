@@ -251,6 +251,7 @@
     <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
+    <script src="{{asset('js/unlimited-daterange.js')}}?v=20260911-no-limit"></script>
 
     <script type="text/javascript">
         const select2 = $(`[data-control='select2']`);
@@ -333,35 +334,7 @@
                 });
             }
 
-            let date = $('#tanggal-pembuatan');
-            date.daterangepicker({
-                autoUpdateInput: false,
-                todayHighlight: true,
-                autoclose: true,
-                locale: {
-                    format: 'DD-MM-YYYY',
-                    separator: " - ",
-                    applyLabel: "Terapkan",
-                    cancelLabel: "Batal",
-                    fromLabel: "Dari",
-                    toLabel: "Ke",
-                    customRangeLabel: "Kustom",
-                    daysOfWeek: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"],
-                    monthNames: ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
-                    firstDay: 0,
-                },
-                maxDate: moment()
-            });
-
-            date.on('apply.daterangepicker hide.daterangepicker', function (ev, picker) {
-                if (picker.startDate && picker.endDate) {
-                    $(this).val(picker.startDate.format('DD-MM-YYYY') + ' ~ ' + picker.endDate.format('DD-MM-YYYY'));
-                }
-            });
-
-            date.on('cancel.daterangepicker', function (ev, picker) {
-                $(this).val('');
-            });
+            bindUnlimitedDateRange('#tanggal-pembuatan');
 
             document.getElementById('hapus-tagihan').addEventListener('click', async function (e) {
                 e.preventDefault();

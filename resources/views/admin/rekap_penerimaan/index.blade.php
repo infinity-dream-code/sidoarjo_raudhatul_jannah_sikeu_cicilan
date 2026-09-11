@@ -231,6 +231,7 @@
     <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
+    <script src="{{asset('js/unlimited-daterange.js')}}?v=20260911-no-limit"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 
@@ -338,34 +339,10 @@
                 }
             });
 
-            let startOfMonth = moment().startOf('month');
-            let today = moment();
-            let date = $('#tanggal-transaksi');
-            date.daterangepicker({
-                startDate: startOfMonth,
-                endDate: today,
+            bindUnlimitedDateRange('#tanggal-transaksi', {
+                startDate: moment().startOf('month'),
+                endDate: moment(),
                 autoUpdateInput: true,
-                todayHighlight: true,
-                autoclose: true,
-                locale: {
-                    format: 'DD-MM-YYYY',
-                    separator: " - ",
-                    applyLabel: "Terapkan",
-                    cancelLabel: "Batal",
-                    fromLabel: "Dari",
-                    toLabel: "Ke",
-                    customRangeLabel: "Kustom",
-                    daysOfWeek: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"],
-                    monthNames: ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
-                    firstDay: 0,
-                },
-                maxDate: moment()
-            });
-
-            date.on('apply.daterangepicker hide.daterangepicker', function (ev, picker) {
-                if (picker.startDate && picker.endDate) {
-                    $(this).val(picker.startDate.format('DD-MM-YYYY') + ' ~ ' + picker.endDate.format('DD-MM-YYYY'));
-                }
             });
 
             function generateTableRow(data, kelas) {

@@ -628,6 +628,7 @@
     <script src="{{asset('js/data-tagihan-init.js')}}?v=20260907-expired"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
+    <script src="{{asset('js/unlimited-daterange.js')}}?v=20260911-no-limit"></script>
 
     <script type="module">
         import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
@@ -1508,35 +1509,7 @@
                 });
             }
 
-            let date = $('#tanggal-pembuatan');
-            date.daterangepicker({
-                autoUpdateInput: false,
-                todayHighlight: true,
-                autoclose: true,
-                locale: {
-                    format: 'DD-MM-YYYY',
-                    separator: " - ",
-                    applyLabel: "Terapkan",
-                    cancelLabel: "Batal",
-                    fromLabel: "Dari",
-                    toLabel: "Ke",
-                    customRangeLabel: "Kustom",
-                    daysOfWeek: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"],
-                    monthNames: ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
-                    firstDay: 0,
-                },
-                maxDate: moment()
-            });
-
-            date.on('apply.daterangepicker hide.daterangepicker', function (ev, picker) {
-                if (picker.startDate && picker.endDate) {
-                    $(this).val(picker.startDate.format('DD-MM-YYYY') + ' ~ ' + picker.endDate.format('DD-MM-YYYY'));
-                }
-            });
-
-            date.on('cancel.daterangepicker', function (ev, picker) {
-                $(this).val('');
-            });
+            bindUnlimitedDateRange('#tanggal-pembuatan');
 
             pdfMake.fonts = {
                 Times: {

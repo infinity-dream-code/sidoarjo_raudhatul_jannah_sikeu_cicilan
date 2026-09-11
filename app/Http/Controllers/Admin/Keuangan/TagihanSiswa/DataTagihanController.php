@@ -1290,12 +1290,9 @@ class DataTagihanController extends Controller
         foreach ($filter as $key => $val) {
             switch ($key) {
                 case 'scctbill.FTGLTagihan':
-                    if (preg_match('/^\d{2}-\d{2}-\d{4} [-\/~] \d{2}-\d{2}-\d{4}$/', $val)) {
-                        $val = preg_replace('/[-\/~]/', '-', $val);
-
-                        list($startDate, $endDate) = explode(' - ', $val);
-                        $startDate = Carbon::createFromFormat('d-m-Y', $startDate)->startOfDay();
-                        $endDate = Carbon::createFromFormat('d-m-Y', $endDate)->endOfDay();
+                    if (preg_match('/^(\d{2}-\d{2}-\d{4})\s*[~\-\/]\s*(\d{2}-\d{2}-\d{4})$/', trim((string) $val), $dateParts)) {
+                        $startDate = Carbon::createFromFormat('d-m-Y', $dateParts[1])->startOfDay();
+                        $endDate = Carbon::createFromFormat('d-m-Y', $dateParts[2])->endOfDay();
                         if ($startDate && $endDate) {
                             ($key) && $filters[] = [$key, $startDate, $endDate, 'whereBetween'];
                         }

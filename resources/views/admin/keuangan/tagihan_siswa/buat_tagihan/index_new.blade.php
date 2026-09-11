@@ -391,7 +391,7 @@
                 if (xhr.status === 422) {
                     errorAlert('Gagal mendapat data siswa')
                 } else if (xhr.status === 419) {
-                    errorAlert('Sesi anda telah habis, Silahkan Login Kembali')
+                    errorAlert('Permintaan gagal diproses. Silakan coba lagi.')
                 } else if (xhr.status === 500) {
                     errorAlert('Tidak dapat terhubung ke server, Silahkan periksa koneksi internet anda')
                 } else if (xhr.status === 403) {
@@ -425,7 +425,7 @@
                 if (xhr.status === 422) {
                     errorAlert('Gagal mendapat data siswa')
                 } else if (xhr.status === 419) {
-                    errorAlert('Sesi anda telah habis, Silahkan Login Kembali')
+                    errorAlert('Permintaan gagal diproses. Silakan coba lagi.')
                 } else if (xhr.status === 500) {
                     errorAlert('Tidak dapat terhubung ke server, Silahkan periksa koneksi internet anda')
                 } else if (xhr.status === 403) {
@@ -667,7 +667,7 @@
                             }
                         }
                     } else if (xhr.status === 419) {
-                        errorAlert('Sesi anda telah habis, Silahkan Login Kembali');
+                        errorAlert('Permintaan gagal diproses. Silakan coba lagi.');
                     } else if (xhr.status === 500) {
                         errorAlert('Tidak dapat terhubung ke server, Silahkan periksa koneksi internet anda');
                     } else if (xhr.status === 403) {

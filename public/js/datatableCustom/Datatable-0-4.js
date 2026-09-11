@@ -1067,7 +1067,7 @@ async function dataTableCreate(options) {
                 }
             }, error: function (xhr, error, code) {
                 const descriptions = {
-                    '401': 'Sesi anda telah habis, silahkan login kembali!',
+                    '401': 'Permintaan gagal diproses. Silakan coba lagi.',
                     '404': 'Data tidak ditemukan!',
                     '500': 'Internal Server Error',
                 };
@@ -1702,7 +1702,7 @@ async function getDT(options) {
         success: finishColumns,
             error: function (xhr) {
                 const descriptions = {
-                    401: 'Sesi anda telah habis, silahkan login kembali!',
+                    401: 'Permintaan gagal diproses. Silakan coba lagi.',
                     403: 'Anda tidak memiliki izin untuk mengakses kolom data.',
                     404: 'Endpoint kolom data tidak ditemukan.',
                     500: 'Gagal memuat definisi kolom tabel.',

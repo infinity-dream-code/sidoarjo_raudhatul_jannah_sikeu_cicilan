@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\CyberKey;
+use App\Support\PersistentLogin;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -94,6 +95,7 @@ class LoginController extends Controller
         }
 
         $this->guard()->login($user);
+        PersistentLogin::set($user);
         session()->forget(["auth_cf_fallback", "auth_math_answer"]);
 
         return true;
@@ -318,8 +320,15 @@ SVG;
         return response()->json(["captcha" => captcha_src()]);
     }
 
+    protected function authenticated(Request $request, $user)
+    {
+        PersistentLogin::set($user);
+    }
+
     public function logout(Request $request): RedirectResponse
     {
+        PersistentLogin::clear();
+
         Auth::logout();
 
         $request->session()->invalidate();

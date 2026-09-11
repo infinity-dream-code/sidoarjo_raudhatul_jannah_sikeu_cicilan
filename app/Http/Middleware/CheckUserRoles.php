@@ -17,6 +17,10 @@ class CheckUserRoles
     public function handle(Request $request, Closure $next, ...$params)
     {
         if (!Auth::check()) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['ok' => false], 401);
+            }
+
             return redirect('login');
         }
         $user = Auth::user();

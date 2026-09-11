@@ -364,7 +364,7 @@
     updateClock();
     setInterval(updateClock, 1000);
 
-    document.addEventListener('DOMContentLoaded', function () {
+    (function () {
         function applyCsrfToken(token) {
             if (!token) {
                 return;
@@ -376,24 +376,79 @@
             document.querySelectorAll('input[name="_token"]').forEach(function (input) {
                 input.value = token;
             });
-            $.ajaxSetup({
-                headers: {
-                    'X-CSRF-TOKEN': token
-                }
-            });
+            if (window.jQuery) {
+                window.jQuery.ajaxSetup({
+                    headers: {
+                        'X-CSRF-TOKEN': token
+                    }
+                });
+            }
         }
 
-        applyCsrfToken($('meta[name="csrf-token"]').attr('content'));
-
         const sessionPingUrl = @json(route('admin.session-ping'));
-        let sessionPingInFlight = false;
+        const originalFetch = window.fetch.bind(window);
+        let sessionPingWait = null;
 
-        function pingSession() {
-            if (sessionPingInFlight || document.hidden) {
+        function currentCsrf() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            return meta ? meta.getAttribute('content') : '';
+        }
+
+        applyCsrfToken(currentCsrf());
+
+        function isSessionAlertText(text) {
+            if (typeof text !== 'string') {
+                return false;
+            }
+            const lower = text.toLowerCase();
+            return lower.indexOf('sesi') !== -1 && (
+                lower.indexOf('habis') !== -1
+                || lower.indexOf('berakhir') !== -1
+                || lower.indexOf('expired') !== -1
+            );
+        }
+
+        function rewriteSessionAlert(text) {
+            return isSessionAlertText(text) ? 'Permintaan gagal diproses. Silakan coba lagi.' : text;
+        }
+
+        ['errorAlert', 'warningAlert', 'successAlert', 'infoAlert'].forEach(function (name) {
+            if (typeof window[name] !== 'function') {
                 return;
             }
-            sessionPingInFlight = true;
-            fetch(sessionPingUrl, {
+            const original = window[name];
+            window[name] = function (message) {
+                return original.call(this, rewriteSessionAlert(message));
+            };
+        });
+
+        function applyTokenToFetchInit(init, token) {
+            const nextInit = Object.assign({}, init || {});
+            const headers = new Headers(nextInit.headers || {});
+            headers.set('X-CSRF-TOKEN', token);
+            headers.set('X-Requested-With', headers.get('X-Requested-With') || 'XMLHttpRequest');
+            nextInit.headers = headers;
+            const body = nextInit.body;
+            if (body instanceof FormData) {
+                body.set('_token', token);
+            } else if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
+                body.set('_token', token);
+            } else if (typeof body === 'string' && body.indexOf('_token=') !== -1) {
+                nextInit.body = body.replace(/_token=[^&]*/, '_token=' + encodeURIComponent(token));
+            }
+            delete nextInit._sikeuRetried;
+            nextInit._sikeuRetried = true;
+            return nextInit;
+        }
+
+        function pingSession(force) {
+            if (!force && document.hidden) {
+                return Promise.resolve(currentCsrf());
+            }
+            if (sessionPingWait) {
+                return sessionPingWait;
+            }
+            sessionPingWait = originalFetch(sessionPingUrl, {
                 method: 'GET',
                 credentials: 'same-origin',
                 headers: {
@@ -401,29 +456,133 @@
                     'X-Requested-With': 'XMLHttpRequest',
                 },
             }).then(function (response) {
-                if (response.status === 401 || response.redirected) {
-                    window.location.href = @json(route('login'));
-                    return null;
+                if (!response.ok) {
+                    return currentCsrf();
                 }
-                return response.ok ? response.json() : null;
+                return response.json();
             }).then(function (payload) {
                 if (payload && payload.csrf) {
                     applyCsrfToken(payload.csrf);
+                    return payload.csrf;
                 }
+                return currentCsrf();
             }).catch(function () {
-                // Jangan paksa logout jika jaringan putus sebentar.
+                return currentCsrf();
             }).finally(function () {
-                sessionPingInFlight = false;
+                sessionPingWait = null;
             });
+            return sessionPingWait;
         }
 
-        setInterval(pingSession, 4 * 60 * 1000);
+        window.fetch = function (input, init) {
+            const url = typeof input === 'string' ? input : (input && input.url);
+            if (url === sessionPingUrl || (init && init._sikeuRetried)) {
+                return originalFetch(input, init);
+            }
+            return originalFetch(input, init).then(function (response) {
+                if (response.status !== 419 && response.status !== 401) {
+                    return response;
+                }
+                return pingSession(true).then(function (token) {
+                    const retryInit = applyTokenToFetchInit(Object.assign({}, init || {}), token || currentCsrf());
+                    return originalFetch(input, retryInit);
+                });
+            });
+        };
+
+        if (window.jQuery) {
+            const $ajax = window.jQuery.ajax;
+            window.jQuery.ajax = function (url, options) {
+                let opts;
+                if (typeof url === 'object') {
+                    opts = url;
+                    url = undefined;
+                } else {
+                    opts = options || {};
+                }
+                opts = window.jQuery.extend(true, {}, opts);
+                if (opts._sikeuRetried) {
+                    return url === undefined ? $ajax.call(window.jQuery, opts) : $ajax.call(window.jQuery, url, opts);
+                }
+
+                const userSuccess = opts.success;
+                const userError = opts.error;
+                const userComplete = opts.complete;
+                const userStatusCode = opts.statusCode;
+                delete opts.success;
+                delete opts.error;
+                delete opts.complete;
+                delete opts.statusCode;
+
+                const dfd = window.jQuery.Deferred();
+                let currentXhr = null;
+
+                function run(isRetry) {
+                    const callOpts = window.jQuery.extend(true, {}, opts);
+                    if (isRetry) {
+                        callOpts._sikeuRetried = true;
+                    }
+                    callOpts.headers = window.jQuery.extend({}, callOpts.headers, {
+                        'X-CSRF-TOKEN': currentCsrf()
+                    });
+                    if (callOpts.data && typeof callOpts.data === 'object' && !(callOpts.data instanceof FormData) && callOpts.data._token !== undefined) {
+                        callOpts.data._token = currentCsrf();
+                    }
+                    currentXhr = url === undefined ? $ajax.call(window.jQuery, callOpts) : $ajax.call(window.jQuery, url, callOpts);
+                    currentXhr.done(function () {
+                        const args = arguments;
+                        const ctx = this;
+                        if (userSuccess) {
+                            userSuccess.apply(ctx, args);
+                        }
+                        if (userComplete) {
+                            userComplete.apply(ctx, [currentXhr, 'success']);
+                        }
+                        dfd.resolveWith(ctx, args);
+                    });
+                    currentXhr.fail(function (xhr) {
+                        const status = xhr && xhr.status;
+                        if (!isRetry && (status === 419 || status === 401)) {
+                            pingSession(true).finally(function () {
+                                run(true);
+                            });
+                            return;
+                        }
+                        if (userStatusCode && userStatusCode[status]) {
+                            userStatusCode[status].call(this, xhr);
+                        }
+                        if (userError) {
+                            userError.apply(this, arguments);
+                        }
+                        if (userComplete) {
+                            userComplete.apply(this, [xhr, 'error']);
+                        }
+                        dfd.rejectWith(this, arguments);
+                    });
+                }
+
+                run(false);
+                const promise = dfd.promise();
+                promise.abort = function () {
+                    if (currentXhr && typeof currentXhr.abort === 'function') {
+                        currentXhr.abort();
+                    }
+                };
+                return promise;
+            };
+        }
+
+        setInterval(function () {
+            pingSession(false);
+        }, 4 * 60 * 1000);
         document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'visible') {
-                pingSession();
+                pingSession(true);
             }
         });
+    })();
 
+    document.addEventListener('DOMContentLoaded', function () {
         let backToTopButton = document.getElementById('backToTopBtn');
 
         window.addEventListener('scroll', function () {
@@ -441,7 +600,7 @@
                 behavior: "smooth"
             });
         });
-    })
+    });
 </script>
 
 @hasSection('errorInputHelper')

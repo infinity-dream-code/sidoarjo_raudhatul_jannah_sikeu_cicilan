@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\PersistentLogin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -49,7 +50,9 @@ class AuthController extends Controller
     // Handle logout logic
     public function logout()
     {
+        PersistentLogin::clear();
         Session::forget('user');
+        Auth::logout();
         return redirect()->route('login');
     }
 

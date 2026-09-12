@@ -67,8 +67,8 @@
                 <div class="col-12">
                     <div class="card-datatable table-responsive text-nowrap px-5">
                         <div class="card-header">
-                            TAGIHAN YANG TAMPIL DI BANK
-                            <small class="text-muted d-block">Tagihan belum pernah dibayar (cicilan = 0)</small>
+                            TAGIHAN YANG BISA DIEDIT
+                            <small class="text-muted d-block">Semua tagihan yang belum pernah dibayar. Yang sudah dicicil tidak bisa diubah nominalnya.</small>
                         </div>
                         <div class="col-12">
                             <table class="table table-sm table-bordered table-hover"
@@ -82,7 +82,8 @@
                     </div>
                     <div class="card-datatable table-responsive text-nowrap px-5">
                         <div class="card-header">
-                            TAGIHAN YANG SUDAH DIBAYAR
+                            TAGIHAN YANG SUDAH DIBAYAR / DICICIL
+                            <small class="text-muted d-block">Tidak bisa diedit</small>
                         </div>
                         <table class="table table-sm table-bordered table-hover"
                                id="table-tagihan-dibayar">
@@ -271,7 +272,7 @@
 
             const selectedTagihan = tableTagihan.rows({selected: true});
             if (!selectedTagihan.data()[0]) {
-                warningAlert('Silahkan pilih tagihan yang tampil di bank!')
+                warningAlert('Silahkan pilih tagihan yang bisa diedit!')
                 return;
             }
 
@@ -362,11 +363,10 @@
             const splitByPaidStatus = newData.reduce((acc, item) => {
                 const paidSt = Number(item.PAIDST ?? 0);
                 const billPaid = Number(item.BILLPAID ?? 0);
-                const installmentPaid = Number(item.isINSTALLABLE ?? 0);
 
-                if (paidSt === 1) {
+                if (paidSt === 1 || billPaid > 0) {
                     acc.paid.push(item);
-                } else if (billPaid === 0 && installmentPaid === 0) {
+                } else {
                     acc.unpaid.push(item);
                 }
                 return acc;
@@ -536,6 +536,14 @@
                     {data: 'AA'},
                     {data: 'BILLNM', title: 'NAMA TAGIHAN'},
                     {
+                        data: 'isINSTALLABLE',
+                        title: 'CICILAN',
+                        className: 'text-center',
+                        render: function (data) {
+                            return Number(data ?? 0) > 0 ? 'Ya' : 'Tidak';
+                        }
+                    },
+                    {
                         data: 'BILLAM',
                         title: 'JUMLAH',
                         className: 'text-end',
@@ -567,7 +575,7 @@
                 ],
                 language: {
                     ...languageData,
-                    emptyTable: "Tidak ada tagihan yang belum pernah dibayar"
+                    emptyTable: "Tidak ada tagihan yang bisa diedit"
                 },
 
                 paging: true,
@@ -576,7 +584,7 @@
                 searching: false,
                 lengthChange: false,
                 pageLength: 10,
-                order: [[4, 'asc']],
+                order: [[5, 'asc']],
                 scrollX: true,
             });
 
@@ -599,12 +607,50 @@
                             return value < 0 ? `Rp. -${formatted.replace('Rp. ', '')}` : formatted;
                         }
                     },
+                    {
+                        data: 'BILLPAID',
+                        title: 'TERBAYAR',
+                        className: 'text-end',
+                        render: function (data) {
+                            const value = Number(data ?? 0);
+                            if (!Number.isFinite(value)) {
+                                return 'Rp. 0';
+                            }
+                            return $.fn.dataTable.render.number('.', ',', 0, 'Rp. ').display(Math.abs(value));
+                        }
+                    },
+                    {
+                        data: 'PAYMENTLEFT',
+                        title: 'SISA',
+                        className: 'text-end',
+                        render: function (data) {
+                            const value = Number(data ?? 0);
+                            if (!Number.isFinite(value)) {
+                                return 'Rp. 0';
+                            }
+                            return $.fn.dataTable.render.number('.', ',', 0, 'Rp. ').display(Math.abs(value));
+                        }
+                    },
+                    {
+                        data: 'PAIDST',
+                        title: 'STATUS',
+                        className: 'text-center',
+                        render: function (data, type, row) {
+                            if (Number(data ?? 0) === 1) {
+                                return 'Lunas';
+                            }
+                            if (Number(row.BILLPAID ?? 0) > 0) {
+                                return 'Sudah dicicil';
+                            }
+                            return 'Belum lunas';
+                        }
+                    },
                     {data: 'BILLAC', title: 'PERIODE'},
                     {data: 'FUrutan', title: 'Urutan'},
                 ],
                 language: {
                     ...languageData,
-                    emptyTable: "Tidak ada tagihan yang sudah dibayar"
+                    emptyTable: "Tidak ada tagihan yang sudah dibayar / dicicil"
                 },
 
                 paging: true,
@@ -613,7 +659,7 @@
                 searching: false,
                 lengthChange: false,
                 pageLength: 10,
-                order: [[3, 'asc']],
+                order: [[6, 'asc']],
                 scrollX: true,
             });
 

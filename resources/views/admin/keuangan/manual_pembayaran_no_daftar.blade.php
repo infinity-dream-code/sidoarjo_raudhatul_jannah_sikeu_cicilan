@@ -53,18 +53,17 @@
                     </div>
                     <div class="col-12">
                         <div class="mb-5">
-                            <label class="form-label" for="tahun_pelajaran">
-                                Tahun Pelajaran
+                            <label class="form-label" for="filter_periode">
+                                Periode
                             </label>
-                            <select class="form-select" id="tahun_pelajaran"
-                                    name="filter[tahun_pelajaran]"
+                            <select class="form-select" id="filter_periode"
+                                    name="filter[periode]"
                                     data-control="select2"
-                                    data-placeholder="Pilih Tahun Pelajaran">
+                                    data-placeholder="Pilih Periode">
                                 <option value="all">Semua</option>
-                                @isset($thn_aka)
-                                    @foreach($thn_aka as $item)
-                                        <option
-                                            value="{{$item->thn_aka}}">{{$item->thn_aka}}</option>
+                                @isset($periode)
+                                    @foreach($periode as $item)
+                                        <option value="{{$item}}">{{$item}}</option>
                                     @endforeach
                                 @else
                                     <option>data kosong</option>
@@ -411,16 +410,25 @@
                 const sisaBayar = Number(rowData.sisa_bayar ?? rowData.BILLAM) || 0;
                 const canCicil = Number(rowData.can_cicil ?? 0) === 1;
 
-                input.prop('disabled', false).prop('readonly', false).attr('required', true);
+                input.prop('disabled', false).attr('required', true);
                 input.removeAttr('max min');
                 input.attr('data-sisa-bayar', sisaBayar);
+                input.attr('data-can-cicil', canCicil ? '1' : '0');
                 input.attr('title', canCicil
                     ? 'Tagihan ini dapat dicicil'
                     : 'Tagihan ini tidak dapat dicicil, pembayaran harus lunas');
 
-                const current = parseNominal(input.val());
-                if (fillDefault && current <= 0 && sisaBayar > 0) {
-                    input.val(formatNominal(sisaBayar));
+                if (canCicil) {
+                    input.prop('readonly', false);
+                    const current = parseNominal(input.val());
+                    if (fillDefault && current <= 0 && sisaBayar > 0) {
+                        input.val(formatNominal(sisaBayar));
+                    }
+                } else {
+                    input.prop('readonly', true);
+                    if (sisaBayar > 0) {
+                        input.val(formatNominal(sisaBayar));
+                    }
                 }
             };
 

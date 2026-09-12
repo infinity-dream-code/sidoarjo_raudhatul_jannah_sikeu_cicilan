@@ -18,11 +18,11 @@ return [
 
     'name' => env('APP_NAME', 'Raudhatul Jannah'),
     'nama_instansi' => env('APP_NAMA_INSTANSI', 'Sidoarjo_Raudhatul_Jannah'),
-    'alamat' => env('APP_ALAMAT', 'Kota Semarang, Prov. Jawa Tengah'),
+    'alamat' => env('APP_ALAMAT', 'Kota Sidoarjo, Prov. Jawa Timur'),
     'logo' => env('APP_LOGO', 'icon-jannah.jpeg'),
     'email' => env('APP_EMAIL', 'ypisabkho@gmail.com'),
     'telepon' => env('APP_TELEPON', 'SIKEU'),
-    'domisili' => env('APP_DOMISILI', 'Semarang'),
+    'domisili' => env('APP_DOMISILI', 'Sidoarjo'),
     'nova' => env('APP_NOVA') ?: '797783',
     'biaya_admin' => env('BIAYA_ADMIN', 0),
     'dummy_seeder' => env('DUMMY_SEEDER',false),

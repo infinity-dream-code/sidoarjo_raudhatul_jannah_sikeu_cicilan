@@ -154,7 +154,7 @@
 
 @section('script')
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260912-va-trx"></script>
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/select2/id.min.js')}}"></script>
 
@@ -244,6 +244,17 @@
             if (toolbar && !toolbar.children.length) {
                 toolbar.remove();
             }
+
+            dataTransaksiBtn.addEventListener('click', function (e) {
+                const siswa = ($(`#${dtOptions.formId} [name="filter[siswa]"]`).val() || '').trim();
+                if (!siswa) {
+                    return;
+                }
+                e.preventDefault();
+                const url = new URL(this.getAttribute('href'), window.location.origin);
+                url.searchParams.set('siswa', siswa);
+                window.location.href = url.toString();
+            });
         }
 
     </script>

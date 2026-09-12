@@ -213,12 +213,13 @@ class DataTagihanController extends Controller
             ['data' => 'CODE02', 'name' => 'Unit', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'DESC02', 'name' => 'Kelas', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'DESC03', 'name' => 'Kelompok', 'searchable' => true, 'orderable' => true, 'exportable' => true],
+            ['data' => 'BILLAC', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'BILLNM', 'name' => 'Nama Tagihan', 'searchable' => true, 'orderable' => true, 'exportable' => true],
+            ['data' => 'CICILAN', 'name' => 'Cicilan', 'searchable' => true, 'orderable' => true, 'exportable' => true, 'className' => 'text-center'],
             ['data' => 'BILLAM_TOTAL', 'name' => 'Jumlah Tagihan', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end', 'exportable' => true],
             ['data' => 'BILLAM', 'name' => 'Sisa Tagihan', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end', 'exportable' => true],
             ['data' => 'BILLPAID', 'name' => 'Jumlah Terbayar', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end', 'exportable' => true],
             ['data' => 'PAIDDT', 'name' => 'Tanggal Bayar', 'searchable' => true, 'orderable' => true, 'columnType' => 'timestamp', 'exportable' => true],
-            ['data' => 'BILLAC', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'ExpDate', 'name' => 'Expired Date', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             [
                 'data' => 'FUrutan',
@@ -694,7 +695,10 @@ class DataTagihanController extends Controller
                 return response()->json(['message' => 'Data Kosong'], 422);
             }
 
-            $pdf = Pdf::loadView('cetak.data-tagihan', ['posts' => $posts])->setPaper('a4', 'landscape');
+            $pdf = Pdf::loadView('cetak.data-tagihan', [
+                'posts' => $posts,
+                'domisili' => config('app.domisili') ?: 'Sidoarjo',
+            ])->setPaper('a4', 'landscape');
 
             return $pdf->download('rekap-tagihan.pdf');
         } catch (\Exception $e) {
@@ -785,6 +789,7 @@ class DataTagihanController extends Controller
 
         $sortableColumns = [
             'BILLNM' => 'scctbill.BILLNM',
+            'CICILAN' => 'scctbill.isINSTALLABLE',
             'BILLAM_TOTAL' => 'scctbill.BILLAM',
             'BILLAM' => 'scctbill.PAYMENTLEFT',
             'BILLPAID' => 'scctbill.BILLPAID',
@@ -835,6 +840,7 @@ class DataTagihanController extends Controller
             'scctbill.PAIDDT',
             'scctbill.ExpDate',
             'scctbill.INSTALLMENT',
+            'scctbill.isINSTALLABLE',
             'scctbill.TRANSNO as BILL_TRANSNO',
             'scctbill.BTA',
             'scctbill.FIDBANK',
@@ -970,6 +976,8 @@ class DataTagihanController extends Controller
                 $waUrl = WhatsappTagihan::waMeUrl($noWa, $waMessage);
 
                 $canHapus = $this->canHapusTagihan($item);
+                $isInstallable = (int) ($get('isINSTALLABLE') ?? 0) === 1
+                    || mst_tagihan::canInstallment((string) ($get('BILLNM') ?? ''));
 
                 return [
                     'AA' => $get('AA'),
@@ -984,6 +992,8 @@ class DataTagihanController extends Controller
                     'DESC03' => $get('DESC03'),
                     'NO_WA' => $noWa,
                     'BILLNM' => $get('BILLNM'),
+                    'isINSTALLABLE' => $isInstallable ? 1 : 0,
+                    'CICILAN' => $isInstallable ? 'Ya' : 'Tidak',
                     'BILLAM_TOTAL' => $get('BILLAM'),
                     'BILLAM' => $get('PAYMENTLEFT'),
                     'BILLPAID' => $get('BILLPAID'),
@@ -1021,7 +1031,7 @@ class DataTagihanController extends Controller
             "recordsFiltered" => $totalRecordswithFilter ?? 0,
             "data" => $records ?? [],
             'totals' => [
-                'tagihan' => ['location' => 11, 'value' => $totalTagihan, 'columnType' => 'currency'],
+                'tagihan' => ['location' => 13, 'value' => $totalTagihan, 'columnType' => 'currency'],
             ]
         );
         return response()->json($response);

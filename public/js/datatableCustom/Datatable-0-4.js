@@ -149,9 +149,55 @@ const EXCEL_DATE_FORMATS = {
     'basicdate':  { code: 'd mmmm yyyy',                   id: '177' },
     'date':       { code: 'dddd", "d mmmm yyyy',           id: '178' },
     'dateformat': { code: 'dddd", "d mmmm yyyy',           id: '178' },
-    'timestamp':  { code: 'dddd", "d mmmm yyyy hh:mm',     id: '179' },
-    'datetime':   { code: 'dddd", "d mmmm yyyy hh:mm',     id: '179' },
 };
+
+const ID_DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const ID_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+function padTime(value) {
+    return String(value).padStart(2, '0');
+}
+
+function parseDateTimeValue(value) {
+    if (!value || value === '0000-00-00 00:00:00' || value === '0000-00-00') {
+        return null;
+    }
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value;
+    }
+    const raw = String(value).trim();
+    if (/Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember/i.test(raw)) {
+        return raw;
+    }
+    const mysql = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (mysql) {
+        return new Date(
+            Number(mysql[1]),
+            Number(mysql[2]) - 1,
+            Number(mysql[3]),
+            Number(mysql[4]),
+            Number(mysql[5]),
+            Number(mysql[6] || 0)
+        );
+    }
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDateTimeId(value, withSeconds = true, compact = false) {
+    const parsed = parseDateTimeValue(value);
+    if (!parsed) {
+        return '';
+    }
+    if (typeof parsed === 'string') {
+        return parsed;
+    }
+    const time = `${padTime(parsed.getHours())}:${padTime(parsed.getMinutes())}${withSeconds ? ':' + padTime(parsed.getSeconds()) : ''}`;
+    if (compact) {
+        return `${padTime(parsed.getDate())}-${padTime(parsed.getMonth() + 1)}-${parsed.getFullYear()} ${time}`;
+    }
+    return `${ID_DAYS[parsed.getDay()]}, ${parsed.getDate()} ${ID_MONTHS[parsed.getMonth()]} ${parsed.getFullYear()} ${time}`;
+}
 
 function addExcelDateStyle(xlsx, formatCode, numFmtId) {
     const stylesXml = xlsx.xl['styles.xml'];
@@ -192,6 +238,10 @@ function applyExcelDateStyles(xlsx, sheet, dataColumns) {
     dataColumns.forEach(col => {
         if (col.exportable !== true) return;
         const ct = col.columnType?.toLowerCase();
+        if (ct === 'timestamp' || ct === 'datetime') {
+            excelIdx++;
+            return;
+        }
         const fmt = ct ? EXCEL_DATE_FORMATS[ct] : null;
 
         if (fmt) {
@@ -208,6 +258,22 @@ function applyExcelDateStyles(xlsx, sheet, dataColumns) {
                     cell.removeAttr('t');
                 }
             });
+        }
+        excelIdx++;
+    });
+}
+
+function applyExcelTimestampColumnWidths(sheet, dataColumns) {
+    let excelIdx = 0;
+    dataColumns.forEach(col => {
+        if (col.exportable !== true) return;
+        const ct = (col.columnType || '').toLowerCase();
+        if (ct === 'timestamp' || ct === 'datetime') {
+            const colNode = $('col', sheet).eq(excelIdx);
+            if (colNode.length) {
+                colNode.attr('width', '48');
+                colNode.attr('customWidth', '1');
+            }
         }
         excelIdx++;
     });
@@ -657,6 +723,7 @@ function dtButtons(options, buttons) {
 
                 applyStyleToColumns(sheet, rupiahStyleIndex, currencyColumns);
                 applyExcelDateStyles(xlsx, sheet, options.dataColumns);
+                applyExcelTimestampColumnWidths(sheet, options.dataColumns);
 
                 const duplicateCols = getDuplicateExportColumns(options.dataColumns);
                 mergeExcelDuplicates(xlsx, sheet, duplicateCols);
@@ -704,11 +771,22 @@ function dtButtons(options, buttons) {
                         });
                     }
                     const colCount = tableNode.table.body[0].length;
-                    const pageWidth = doc.pageOrientation === 'landscape' ? 842 : 595;
+                    const pageSizes = { A4: [595.28, 841.89], A3: [841.89, 1190.55], LETTER: [612, 792], LEGAL: [612, 1008] };
+                    const pageKey = String(doc.pageSize || options.pdfPageSize || 'A4').toUpperCase();
+                    const pageSize = pageSizes[pageKey] || pageSizes.A4;
+                    const pageWidth = doc.pageOrientation === 'landscape' ? pageSize[1] : pageSize[0];
                     const margins = doc.pageMargins || [10, 10, 10, 10];
                     const usableWidth = pageWidth - margins[0] - margins[2] - 16;
-                    const colWidth = Math.max(usableWidth / colCount, 28);
                     const exportableColumns = options.dataColumns.filter(col => col.exportable === true);
+                    const timestampIdx = {};
+                    exportableColumns.forEach((col, idx) => {
+                        const ct = (col.columnType || '').toLowerCase();
+                        if (ct === 'timestamp' || ct === 'datetime') {
+                            timestampIdx[idx] = true;
+                        }
+                    });
+                    const extraTs = Object.keys(timestampIdx).length * 36;
+                    const baseWidth = Math.max((usableWidth - extraTs) / colCount, 24);
 
                     if (options.pdfColumnWidths && exportableColumns.length === colCount) {
                         tableNode.table.widths = exportableColumns.map(col => {
@@ -719,17 +797,19 @@ function dtButtons(options, buttons) {
                             if (typeof configured === 'number') {
                                 return configured;
                             }
-                            return colWidth;
+                            return baseWidth;
                         });
                     } else if (options.pdfWidths && options.pdfWidths.length === colCount) {
                         tableNode.table.widths = options.pdfWidths.map(width => {
                             if (width === '*' || width === 'auto') {
                                 return width;
                             }
-                            return Number(width) || colWidth;
+                            return Number(width) || baseWidth;
                         });
                     } else {
-                        tableNode.table.widths = Array(colCount).fill(colWidth);
+                        tableNode.table.widths = Array.from({ length: colCount }, (_, idx) => (
+                            timestampIdx[idx] ? baseWidth + 36 : baseWidth
+                        ));
                     }
 
                     for (let rowIndex = 0; rowIndex < tableNode.table.body.length; rowIndex++) {
@@ -765,9 +845,10 @@ function dtButtons(options, buttons) {
                 const landscape = options.pdfOrientation === 'landscape'
                     || options.dataColumns.filter(col => col.exportable === true).length > 8;
                 const fontSize = options.pdfFontSize ?? 8;
+                const pageSize = String(options.pdfPageSize || 'A4').toUpperCase();
                 const style = win.document.createElement('style');
                 style.innerHTML = `
-                    @page { size: ${landscape ? 'landscape' : 'portrait'}; margin: 12mm; }
+                    @page { size: ${pageSize} ${landscape ? 'landscape' : 'portrait'}; margin: 10mm; }
                     body { font-size: ${fontSize}px; }
                     table { width: 100% !important; font-size: ${fontSize}px !important; table-layout: fixed; }
                     th, td { white-space: normal !important; word-break: break-word; padding: 2px 4px !important; }
@@ -796,7 +877,7 @@ function dtButtons(options, buttons) {
                 body: function (data, row, column, node) {
                     if (data === null) return '';
                     const exportableColumns = options.dataColumns.filter(col => col.exportable === true);
-                    const columnInfo = exportableColumns[column];
+                    const columnInfo = exportableColumns[column] || options.dataColumns[column] || {};
                     let columnType = columnInfo.columnType;
 
                     const numberColumn = columnInfo.numberColumn;
@@ -804,7 +885,7 @@ function dtButtons(options, buttons) {
                     // console.log(rawData)
                     // console.log(exportableColumns)
 
-                    if (columnType !== null) {
+                    if (columnType) {
                         switch (columnType.toLowerCase()) {
                             case 'row':
                             case 'number':
@@ -837,30 +918,13 @@ function dtButtons(options, buttons) {
                                 };
                                 return date.toLocaleDateString('id-ID', dateOptions);
                             case 'timestamp':
-                            case 'datetime':
-                                if (!data || data === '0000-00-00 00:00:00' || data === '0000-00-00') {
-                                    return '';
-                                }
+                            case 'datetime': {
+                                const formatted = formatDateTimeId(data, true, config.extend === 'pdf');
                                 if (config.extend === 'excel') {
-                                    const excelDate = new Date(data);
-                                    if (Number.isNaN(excelDate.getTime())) {
-                                        return '';
-                                    }
-                                    return dateToExcelSerial(excelDate);
+                                    return '\u0000' + formatted;
                                 }
-                                const tsDate = new Date(data);
-                                if (Number.isNaN(tsDate.getTime())) {
-                                    return '';
-                                }
-                                const tsOptions = {
-                                    weekday: 'long',
-                                    day: 'numeric',
-                                    month: 'long',
-                                    year: 'numeric',
-                                    hour: 'numeric',
-                                    minute: 'numeric'
-                                };
-                                return tsDate.toLocaleDateString('id-ID', tsOptions);
+                                return formatted;
+                            }
                             case 'periode':
                             case 'yearmonth':
                                 if (!data || typeof data !== 'string' || data.length !== 6 || !/^\d{6}$/.test(data)) {
@@ -1381,22 +1445,7 @@ async function getDT(options) {
                             case 'datetime':
                                 renderFunc = function (data, type, row) {
                                     if (type === 'display' || type === 'filter') {
-                                        if (!data || data === '0000-00-00 00:00:00' || data === '0000-00-00') {
-                                            return '';
-                                        }
-                                        const date = new Date(data);
-                                        if (Number.isNaN(date.getTime())) {
-                                            return '';
-                                        }
-                                        const options = {
-                                            weekday: 'long',
-                                            day: 'numeric',
-                                            month: 'long',
-                                            year: 'numeric',
-                                            hour: 'numeric',
-                                            minute: 'numeric'
-                                        };
-                                        return date.toLocaleDateString('id-ID', options);
+                                        return formatDateTimeId(data, true);
                                     }
                                     return data;
                                 };

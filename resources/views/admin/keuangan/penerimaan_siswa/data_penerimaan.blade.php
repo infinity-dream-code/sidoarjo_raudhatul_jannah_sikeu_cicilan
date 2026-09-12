@@ -2,6 +2,10 @@
 @section('title',$dataTitle??$mainTitle??$title??'')
 @section('style')
     <style>
+        #main_table_wrapper .dt-buttons {
+            display: none !important;
+        }
+
         table.dataTable tr.selected {
             border-top: 2px solid var(--bs-primary);
             border-bottom: 2px solid var(--bs-primary);
@@ -395,7 +399,7 @@
 
     {{--    <script src="{{asset('main/libs/select2/select2.full.min.js')}}"></script>--}}
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260723-android-bill-noreff"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260912-tanggal-id"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
 

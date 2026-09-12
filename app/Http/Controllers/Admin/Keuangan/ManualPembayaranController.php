@@ -114,7 +114,7 @@ class ManualPembayaranController extends Controller
                 }
             }
 
-            $tahun_pelajaran = data_get($request->input('filter', []), 'tahun_pelajaran');
+            $periode = data_get($request->input('filter', []), 'periode', data_get($request->input('filter', []), 'tahun_pelajaran'));
 
             $whereAny = [
                 'scctcust.nmcust',
@@ -133,6 +133,7 @@ class ManualPembayaranController extends Controller
                 'scctbill.BTA',
                 'scctbill.FIDBANK',
                 'scctbill.NOREFF',
+                'scctbill.isINSTALLABLE',
                 'scctbill.FUrutan',
                 'scctcust.CUSTID',
                 'scctcust.CODE02',
@@ -148,8 +149,8 @@ class ManualPembayaranController extends Controller
                 ->where('scctbill.PAIDST', '=', 0)
                 ->where('scctbill.FSTSBolehBayar', '=', 1)
                 ->tap(fn ($q) => SchoolScope::apply($q, 'scctcust'))
-                ->when($tahun_pelajaran && $tahun_pelajaran != 'all', function ($query) use ($tahun_pelajaran) {
-                    return $query->where('scctbill.BTA', '=', $tahun_pelajaran);
+                ->when($periode && $periode != 'all', function ($query) use ($periode) {
+                    return $query->where('scctbill.BILLAC', '=', $periode);
                 })
             ->groupBy('scctbill.AA');
 
@@ -176,7 +177,7 @@ class ManualPembayaranController extends Controller
                     }
                     $item->PAYMENTLEFT = $this->resolvePaymentLeft($item);
                     $item->sisa_bayar = $item->PAYMENTLEFT;
-                    $item->can_cicil = mst_tagihan::canInstallment($item->BILLNM) ? 1 : 0;
+                    $item->can_cicil = ((int) ($item->isINSTALLABLE ?? 0) === 1 || mst_tagihan::canInstallment($item->BILLNM)) ? 1 : 0;
                     $item->FIDBANK = MetodeBayarHelper::resolveDisplayFidBank(
                         $item->FIDBANK !== null ? (string) $item->FIDBANK : null,
                         $item->NOREFF !== null ? (string) $item->NOREFF : null
@@ -202,11 +203,12 @@ class ManualPembayaranController extends Controller
         $data['dataTitle'] = $this->dataTitle;
         $data['showTitle'] = $this->showTitle;
         $data['columnsUrl'] = $this->columnsUrl;
-        $data['thn_aka'] = \App\Models\mst_thn_aka::select(['thn_aka'])
-            ->whereNotNull('thn_aka')
+        $data['periode'] = scctbill::query()
+            ->whereNotNull('BILLAC')
+            ->where('BILLAC', '!=', '')
             ->distinct()
-            ->orderBy('thn_aka', 'desc')
-            ->get();
+            ->orderBy('BILLAC', 'desc')
+            ->pluck('BILLAC');
 
         $data['datasUrl'] = $this->datasUrl;
 //        $data['thn_aka'] = mst_thn_aka::where('thn_aka', '!=', null)->get();

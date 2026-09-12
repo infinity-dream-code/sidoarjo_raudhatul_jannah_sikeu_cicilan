@@ -215,9 +215,19 @@
                                 </select>
                             </div>
                             <div class="mb-5">
-                                <label class="form-label" for="post">
-                                    Nama Tagihan
-                                </label>
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                                    <label class="form-label mb-0" for="post">
+                                        Nama Tagihan
+                                    </label>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-primary" id="post-select-all">
+                                            Pilih semua
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" id="post-clear">
+                                            Kosongkan
+                                        </button>
+                                    </div>
+                                </div>
                                 <select class="form-select" id="post"
                                         name="filter[post][]"
                                         multiple
@@ -232,6 +242,7 @@
                                         <option>data kosong</option>
                                     @endisset
                                 </select>
+                                <small class="text-muted">Pilih semua, lalu hapus centang nama tagihan yang tidak ingin ditampilkan.</small>
                             </div>
                         </div>
                         <div class="col">
@@ -617,7 +628,7 @@
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
     <script src="{{asset('js/va-format.js')}}?v=20260619"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260724-excel-total-fix"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260912-pdf-tanggal"></script>
     <script>
         window.DATA_TAGIHAN_BOOT = {
             columnUrl: @json($columnsUrl ?? null),
@@ -1501,13 +1512,26 @@
             if (select2.length) {
                 select2.each(function () {
                     let $this = $(this);
-                    // select2Focus($this);
+                    const isPostFilter = this.id === 'post';
                     $this.wrap('<div class="position-relative"></div>').select2({
-                        placeholder: 'Select value',
-                        dropdownParent: $this.parent()
+                        placeholder: $this.data('placeholder') || 'Select value',
+                        dropdownParent: $this.parent(),
+                        closeOnSelect: !isPostFilter,
+                        allowClear: isPostFilter
                     });
                 });
             }
+
+            $('#post-select-all').on('click', function () {
+                const $post = $('#post');
+                const values = $post.find('option').map(function () {
+                    return this.value;
+                }).get();
+                $post.val(values).trigger('change');
+            });
+            $('#post-clear').on('click', function () {
+                $('#post').val(null).trigger('change');
+            });
 
             bindUnlimitedDateRange('#tanggal-pembuatan');
 

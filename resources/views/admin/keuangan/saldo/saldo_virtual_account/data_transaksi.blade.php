@@ -39,6 +39,16 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3 row">
+                                <label for="filter_siswa" class="col-sm-4 col-form-label form-label">NIS / Nama</label>
+                                <div class="col-sm-8">
+                                    <input type="text" class="form-control" id="filter_siswa"
+                                           name="filter[siswa]" placeholder="Masukkan NIS / Nama / No VA"
+                                           value="{{ $prefillSiswa ?? '' }}" autocomplete="off">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3 row">
                                 <label for="filter_dari_tanggal" class="col-sm-4 col-form-label form-label">Dari Tanggal</label>
                                 <div class="col-sm-8">
                                     <input type="text" class="form-control" id="filter_dari_tanggal"
@@ -80,7 +90,7 @@
 
 @section('script')
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260912-va-trx"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
 
     <script type="text/javascript">
@@ -100,9 +110,24 @@
             lengthMenu: [25, 100],
             buttons: ['excel', 'pdf', 'print'],
             pdfOrientation: 'landscape',
-            pdfPageSize: 'A4',
-            pdfMargins: [16, 20, 16, 20],
-            pdfFontSize: 8,
+            pdfPageSize: 'A3',
+            pdfMargins: [12, 12, 12, 12],
+            pdfFontSize: 7,
+            pdfHeaderFontSize: 8,
+            pdfColumnWidths: {
+                no: 22,
+                NOCUST: 50,
+                NOVA: 82,
+                NMCUST: '*',
+                TRXDATE: 92,
+                METODE: 46,
+                DEBET: 58,
+                KREDIT: 58,
+                NOREFF: 72,
+                CODE02: 50,
+                DESC02: 42,
+                DESC03: 50,
+            },
         };
 
         document.addEventListener('DOMContentLoaded', function () {

@@ -205,7 +205,7 @@
                             <li class="list-group-item list-group-timeline-danger">Jika file punya lebih dari 1 sheet, yang diimpor hanya sheet data siswa. Hapus sheet/baris contoh (NIS <span class="fw-bold">99999999…</span>).</li>
                             <li class="list-group-item list-group-timeline-danger">Contoh file yang dapat diproses untuk import:
                                 <a class="btn btn-sm btn-outline-primary fw-bolder"
-                                   href="{{asset('contoh_excel/TEMPLATE MENU UPLOAD TAGIHAN EXCEL.xls')}}">
+                                   href="{{asset('contoh_excel/TEMPLATE MENU UPLOAD TAGIHAN EXCEL.xlsx')}}?v=20260912">
                                     <i class="ri ri-file-excel-line me-2"></i>Contoh File
                                 </a>
                             </li>

@@ -700,7 +700,7 @@ class DataTagihanController extends Controller
                 'domisili' => config('app.domisili') ?: 'Sidoarjo',
             ])->setPaper('a4', 'landscape');
 
-            return $pdf->download('rekap-tagihan.pdf');
+            return $pdf->download('cetak-rekap.pdf');
         } catch (\Exception $e) {
             return response()->json(['message' => 'Tidak dapat mencetak rekap', 'error' => $e->getMessage(), 'e' => $e], 422);
         }

@@ -5,7 +5,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{config('app.nama_instansi')??'Sistem Keuangan'}}</title>
+    <title>Cetak Rekap</title>
 
     <style type="text/css">
         * {
@@ -217,7 +217,7 @@
 <br>
 <table width="100%">
     <tr>
-        <td colspan="2" align="center"><h2>REKAP DATA TAGIHAN</h2></td>
+        <td colspan="2" align="center"><h2>CETAK REKAP</h2></td>
     </tr>
     <tr>
         <td colspan="2" align="center"></td>

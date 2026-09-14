@@ -1471,7 +1471,7 @@
                     $.ajax(ajaxOptions).done(function (response, status, xhr) {
                         try {
                             let blob = new Blob([response], {type: 'application/pdf'});
-                            const filename = 'cetak-rekap.pdf';
+                            const filename = 'cetak-rekap-data-tagihan.pdf';
                             if (typeof window.navigator.msSaveBlob !== 'undefined') {
                                 window.navigator.msSaveBlob(blob, filename);
                             } else {

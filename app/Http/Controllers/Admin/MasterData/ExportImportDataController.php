@@ -9,6 +9,7 @@ use App\Models\mst_sekolah;
 use App\Models\mst_thn_aka;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
+use App\Support\EnsureImportSchoolClass;
 use App\Support\ExcelImportSheet;
 use App\Support\InputSiswaProcedure;
 use App\Support\SchoolScope;
@@ -282,14 +283,25 @@ class ExportImportDataController extends Controller
                     }
 
                     $thnAka = mst_thn_aka::where('thn_aka', $item['angkatan'])->first();
-                    $kelas = mst_kelas::findForImport($item['unit'], $item['kelas'], $item['kelompok']);
-
-                    if (!$thnAka || !$kelas) {
+                    if (!$thnAka) {
                         return response()->json([
-                            'message' => 'Silahkan periksa kembali kelas/tahun akademik siswa',
+                            'message' => 'Silahkan periksa kembali tahun akademik siswa',
                             'nis' => $nis,
-                            'thn_aka' => $thnAka,
-                            'kelas' => $kelas,
+                        ], 422);
+                    }
+
+                    [$sekolahRow, $kelas] = EnsureImportSchoolClass::resolve(
+                        $item['unit'] ?? null,
+                        $item['kelas'] ?? null,
+                        $item['kelompok'] ?? null,
+                        $sekolah,
+                    );
+                    $sekolah = $sekolahRow ?? $sekolah;
+
+                    if (!$kelas || !$sekolah) {
+                        return response()->json([
+                            'message' => 'Unit/kelas tidak dapat dibuat otomatis. Periksa kolom Unit, Kelas, dan Kelompok.',
+                            'nis' => $nis,
                         ], 422);
                     }
 
@@ -325,9 +337,24 @@ class ExportImportDataController extends Controller
 
                     $existingCust = scctcust::where('NUM2ND', $item['nodaftar'])->first();
                     $thnAka = mst_thn_aka::where('thn_aka', $item['angkatan'])->first();
-                    $kelas = mst_kelas::findForImport($item['unit'], $item['kelas'], $item['kelompok']);
+                    if (!$thnAka) {
+                        $this->rollBackIfActive();
 
-                    if (!$thnAka || !$kelas) {
+                        return response()->json([
+                            'message' => 'Silahkan periksa kembali tahun akademik siswa',
+                            'nodaftar' => $item['nodaftar'] ?? null,
+                        ], 422);
+                    }
+
+                    [$sekolahRow, $kelas] = EnsureImportSchoolClass::resolve(
+                        $item['unit'] ?? null,
+                        $item['kelas'] ?? null,
+                        $item['kelompok'] ?? null,
+                        $sekolah,
+                    );
+                    $sekolah = $sekolahRow ?? $sekolah;
+
+                    if (!$kelas || !$sekolah) {
                         Log::warning('export_import_data.validateData.missing_reference', [
                             'nis' => $item['nis'] ?? null,
                             'nodaftar' => $item['nodaftar'] ?? null,
@@ -335,17 +362,13 @@ class ExportImportDataController extends Controller
                             'unit' => $item['unit'] ?? null,
                             'kelas' => $item['kelas'] ?? null,
                             'kelompok' => $item['kelompok'] ?? null,
-                            'thn_aka_found' => (bool) $thnAka,
-                            'kelas_found' => (bool) $kelas,
                             'sekolah' => $sekolah?->CODE01,
                         ]);
 
                         $this->rollBackIfActive();
 
                         return response()->json([
-                            'message' => 'Silahkan periksa kembali kelas/thn_aka siswa',
-                            'thn_aka' => $thnAka,
-                            'kelas' => $kelas,
+                            'message' => 'Unit/kelas tidak dapat dibuat otomatis. Periksa kolom Unit, Kelas, dan Kelompok.',
                         ], 422);
                     }
 
@@ -381,7 +404,12 @@ class ExportImportDataController extends Controller
                     }
 
                     $existingCust = scctcust::where('NOCUST', $item['nis'])->first();
-                    $kelas = mst_kelas::findForImport($item['unit'], $item['kelas'], $item['kelompok']);
+                    [, $kelas] = EnsureImportSchoolClass::resolve(
+                        $item['unit'] ?? null,
+                        $item['kelas'] ?? null,
+                        $item['kelompok'] ?? null,
+                        $sekolah,
+                    );
 
                     if ($existingCust && $kelas) {
                         $existingCust->update([

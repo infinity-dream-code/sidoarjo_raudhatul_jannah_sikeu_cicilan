@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\mst_kelas;
 use App\Models\mst_sekolah;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Import siswa: Excel UNIT = mst_sekolah.DESC01 + mst_kelas.unit
@@ -87,19 +88,22 @@ class EnsureImportSchoolClass
         }
 
         $code = self::nextSekolahCode();
-        $urut = (int) (mst_sekolah::query()->max('urut') ?? 0) + 1;
+        $idColumn = self::sekolahIdColumn();
 
         $sekolah = new mst_sekolah();
-        $sekolah->urut = $urut;
         $sekolah->CODE01 = $code;
         $sekolah->DESC01 = $unit;
+        if ($idColumn) {
+            $sekolah->setKeyName($idColumn);
+            $sekolah->{$idColumn} = (int) (mst_sekolah::query()->max($idColumn) ?? 0) + 1;
+        }
         $sekolah->save();
         $sekolah = $sekolah->fresh() ?? $sekolah;
 
         Log::info('import_siswa.auto_create_sekolah', [
             'CODE01' => $code,
             'DESC01' => $unit,
-            'urut' => $urut,
+            'id' => $sekolah->getKey(),
         ]);
 
         self::$sekolahMemo[$memoKey] = $sekolah;
@@ -163,6 +167,25 @@ class EnsureImportSchoolClass
         self::$kelasMemo[$memoKey] = $kelas;
 
         return $kelas;
+    }
+
+    private static function sekolahIdColumn(): ?string
+    {
+        static $column = false;
+        if ($column !== false) {
+            return $column;
+        }
+
+        $schema = Schema::connection('DATA_MYSQL');
+        if ($schema->hasColumn('mst_sekolah', 'id')) {
+            $column = 'id';
+        } elseif ($schema->hasColumn('mst_sekolah', 'urut')) {
+            $column = 'urut';
+        } else {
+            $column = null;
+        }
+
+        return $column;
     }
 
     private static function nextSekolahCode(): string

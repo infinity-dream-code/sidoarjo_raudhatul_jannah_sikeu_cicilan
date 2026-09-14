@@ -184,6 +184,29 @@ function parseDateTimeValue(value) {
     return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function resolvePdfPageWidth(doc, options) {
+    const pageSizes = {
+        A4: [595.28, 841.89],
+        A3: [841.89, 1190.55],
+        A2: [1190.55, 1683.78],
+        LETTER: [612, 792],
+        LEGAL: [612, 1008],
+        TABLOID: [792, 1224],
+    };
+    const orientation = String(doc.pageOrientation || options.pdfOrientation || 'portrait').toLowerCase();
+    const size = doc.pageSize;
+    if (size && typeof size === 'object') {
+        const width = Number(size.width);
+        const height = Number(size.height);
+        if (width > 0 && height > 0) {
+            return orientation === 'landscape' ? Math.max(width, height) : Math.min(width, height);
+        }
+    }
+    const pageKey = String(options.pdfPageSize || size || 'A4').toUpperCase();
+    const dims = pageSizes[pageKey] || pageSizes.A4;
+    return orientation === 'landscape' ? dims[1] : dims[0];
+}
+
 function formatDateTimeId(value, withSeconds = true, compact = false) {
     const parsed = parseDateTimeValue(value);
     if (!parsed) {
@@ -771,12 +794,9 @@ function dtButtons(options, buttons) {
                         });
                     }
                     const colCount = tableNode.table.body[0].length;
-                    const pageSizes = { A4: [595.28, 841.89], A3: [841.89, 1190.55], LETTER: [612, 792], LEGAL: [612, 1008] };
-                    const pageKey = String(doc.pageSize || options.pdfPageSize || 'A4').toUpperCase();
-                    const pageSize = pageSizes[pageKey] || pageSizes.A4;
-                    const pageWidth = doc.pageOrientation === 'landscape' ? pageSize[1] : pageSize[0];
-                    const margins = doc.pageMargins || [10, 10, 10, 10];
-                    const usableWidth = pageWidth - margins[0] - margins[2] - 16;
+                    const pageWidth = resolvePdfPageWidth(doc, options);
+                    const margins = Array.isArray(doc.pageMargins) ? doc.pageMargins : [8, 8, 8, 8];
+                    const usableWidth = Math.max(pageWidth - (Number(margins[0]) || 0) - (Number(margins[2]) || 0), 120);
                     const exportableColumns = options.dataColumns.filter(col => col.exportable === true);
                     const timestampIdx = {};
                     exportableColumns.forEach((col, idx) => {
@@ -785,11 +805,12 @@ function dtButtons(options, buttons) {
                             timestampIdx[idx] = true;
                         }
                     });
-                    const extraTs = Object.keys(timestampIdx).length * 36;
-                    const baseWidth = Math.max((usableWidth - extraTs) / colCount, 24);
+                    const extraTs = Object.keys(timestampIdx).length * 28;
+                    const baseWidth = Math.max((usableWidth - extraTs) / Math.max(colCount, 1), 16);
 
+                    let widths;
                     if (options.pdfColumnWidths && exportableColumns.length === colCount) {
-                        tableNode.table.widths = exportableColumns.map(col => {
+                        widths = exportableColumns.map(col => {
                             const configured = options.pdfColumnWidths[col.data ?? 'no'];
                             if (configured === '*') {
                                 return '*';
@@ -800,32 +821,43 @@ function dtButtons(options, buttons) {
                             return baseWidth;
                         });
                     } else if (options.pdfWidths && options.pdfWidths.length === colCount) {
-                        tableNode.table.widths = options.pdfWidths.map(width => {
+                        widths = options.pdfWidths.map(width => {
                             if (width === '*' || width === 'auto') {
                                 return width;
                             }
                             return Number(width) || baseWidth;
                         });
                     } else {
-                        tableNode.table.widths = Array.from({ length: colCount }, (_, idx) => (
-                            timestampIdx[idx] ? baseWidth + 36 : baseWidth
+                        widths = Array.from({ length: colCount }, (_, idx) => (
+                            timestampIdx[idx] ? baseWidth + 28 : baseWidth
                         ));
                     }
 
+                    if (!widths.includes('*')) {
+                        const numericSum = widths.reduce((sum, width) => sum + Number(width || 0), 0);
+                        if (numericSum > 0 && Math.abs(numericSum - usableWidth) > 1) {
+                            const scale = usableWidth / numericSum;
+                            widths = widths.map(width => Math.max(14, Number(width) * scale));
+                        }
+                    }
+                    tableNode.table.widths = widths;
+
+                    const pad = options.pdfCellPadding ?? 1;
                     for (let rowIndex = 0; rowIndex < tableNode.table.body.length; rowIndex++) {
                         tableNode.table.body[rowIndex].forEach(cell => {
                             if (cell && typeof cell === 'object') {
                                 cell.noWrap = false;
+                                cell.alignment = cell.alignment || (rowIndex === 0 ? 'center' : 'left');
                             }
                         });
                     }
                     tableNode.layout = {
-                        hLineWidth: () => 0.5,
-                        vLineWidth: () => 0.5,
-                        paddingLeft: () => 2,
-                        paddingRight: () => 2,
-                        paddingTop: () => 2,
-                        paddingBottom: () => 2,
+                        hLineWidth: () => 0.4,
+                        vLineWidth: () => 0.4,
+                        paddingLeft: () => pad,
+                        paddingRight: () => pad,
+                        paddingTop: () => pad,
+                        paddingBottom: () => pad,
                     };
                 }
                 const duplicateCols = getDuplicateExportColumns(options.dataColumns);

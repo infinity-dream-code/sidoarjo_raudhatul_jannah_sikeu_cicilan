@@ -734,13 +734,15 @@
             ws.insertRow(3, ["Tahun Pelajaran", params.get('filter[tahun_pelajaran]') || 'Semua']);
             ws.insertRow(4, ["Periode Mulai", params.get('filter[periode_mulai]') || '-']);
             ws.insertRow(5, ["Periode Akhir", params.get('filter[periode_akhir]') || '-']);
-            ws.insertRow(6, ["Dari Tanggal", parseDDMMYYYY(params.get('filter[dari_tanggal]') || '') || '-']);
-            ws.insertRow(7, ["Sampai Tanggal", parseDDMMYYYY(params.get('filter[sampai_tanggal]') || '') || '-']);
-
-            [6, 7].forEach(rowNumber => {
-                const cell = ws.getRow(rowNumber).getCell(2);
-                if (cell.value instanceof Date) cell.numFmt = "dddd, dd mmmm yyyy";
-            });
+            const formatFilterDate = (value) => {
+                const parsed = parseDDMMYYYY(value || '');
+                if (!(parsed instanceof Date) || Number.isNaN(parsed.getTime())) return '-';
+                const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                return `${days[parsed.getDay()]}, ${parsed.getDate()} ${months[parsed.getMonth()]} ${parsed.getFullYear()}`;
+            };
+            ws.insertRow(6, ["Dari Tanggal", formatFilterDate(params.get('filter[dari_tanggal]'))]);
+            ws.insertRow(7, ["Sampai Tanggal", formatFilterDate(params.get('filter[sampai_tanggal]'))]);
             [1,2,3,4,5,6,7].forEach(rowNumber => {
                 ws.getRow(rowNumber).eachCell({includeEmpty: true}, cell => cell.font = {bold: true});
             });

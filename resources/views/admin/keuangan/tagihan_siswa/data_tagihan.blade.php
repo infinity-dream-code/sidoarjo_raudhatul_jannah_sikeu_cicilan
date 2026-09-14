@@ -1586,9 +1586,6 @@
 
                     const orientation = 'portrait';
                     const pageMargins = [20, 20, 20, 20];
-                    const tanggalSekarang = new Date().toLocaleDateString('id-ID', {
-                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                    });
                     const availableWidth = getContentWidth('A4', orientation, pageMargins);
 
                     // Header (shared)
@@ -1825,16 +1822,11 @@
                         return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
                     };
 
+                    const pad2 = (n) => String(n).padStart(2, '0');
                     const formatPaidDate = (val) => {
                         const dt = parsePaidDate(val);
                         if (!dt) return '-';
-                        return dt.toLocaleString('id-ID', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
+                        return `${pad2(dt.getDate())}-${pad2(dt.getMonth() + 1)}-${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}:${pad2(dt.getSeconds())}`;
                     };
 
                     const bodyContent = [];

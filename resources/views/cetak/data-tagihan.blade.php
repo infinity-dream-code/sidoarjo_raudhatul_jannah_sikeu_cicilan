@@ -343,34 +343,18 @@
 <br>
 <br>
 <table style="width: 100%">
-    <tfoot>
     <tr>
-        <td colspan="5" style="color: #fff;">TESTING</td>
-        <td style="color: #fff;">TESTING</td>
+        <td></td>
         <td align="right">{{ $kota }}, {{ Carbon::now()->locale('id')->isoFormat('dddd, D MMMM YYYY') }}</td>
     </tr>
     <tr>
-        <td colspan="5" style="color: #fff;">TESTING</td>
-        <td style="color: #fff;">TESTING</td>
-        <td align="right">{{Carbon::now()->isoFormat('dddd, D MMMM YYYY')}}</td>
+        <td></td>
+        <td align="right" style="height: 70px;"></td>
     </tr>
     <tr>
-        <td colspan="5" style="color: #fff;">TESTING</td>
-        <td style="color: #fff;">TESTING</td>
-        <td align="right"></td>
-    </tr>
-    <tr>
-        <td colspan="5" style="color: #fff;">TESTING</td>
-        <td style="color: #fff;">KOSONG</td>
-        <td align="right"></td>
-    </tr>
-    TESTING
-    <tr>
-        <td colspan="5" style="color: #fff;">TESTING</td>
-        <td style="color: #fff;">KOSONG</td>
+        <td></td>
         <td align="right">Bagian Keuangan</td>
     </tr>
-    </tfoot>
 </table>
 
 </body>

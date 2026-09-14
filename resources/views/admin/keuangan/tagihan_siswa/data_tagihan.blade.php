@@ -628,7 +628,7 @@
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
     <script src="{{asset('js/va-format.js')}}?v=20260619"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260914-pdf-fit"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260914-pdf-total"></script>
     <script>
         window.DATA_TAGIHAN_BOOT = {
             columnUrl: @json($columnsUrl ?? null),
@@ -636,7 +636,7 @@
             prefetchedColumns: @json($tableColumns ?? []),
         };
     </script>
-    <script src="{{asset('js/data-tagihan-init.js')}}?v=20260914-pdf-fit"></script>
+    <script src="{{asset('js/data-tagihan-init.js')}}?v=20260914-pdf-total"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
     <script src="{{asset('js/unlimited-daterange.js')}}?v=20260911-no-limit"></script>
@@ -692,23 +692,23 @@
             pdfHeaderFontSize: 6,
             pdfCellPadding: 1,
             pdfColumnWidths: {
-                no: 18,
-                NOCUST: 46,
-                NUM2ND: 42,
-                NOVA: 68,
-                NMCUST: '*',
-                CODE02: 26,
-                DESC02: 30,
-                DESC03: 36,
-                BILLAC: 34,
+                no: 'auto',
+                NOCUST: 44,
+                NUM2ND: 36,
+                NOVA: 62,
+                NMCUST: 72,
+                CODE02: 'auto',
+                DESC02: 'auto',
+                DESC03: 'auto',
+                BILLAC: 'auto',
                 BILLNM: '*',
-                CICILAN: 28,
+                CICILAN: 'auto',
                 BILLAM_TOTAL: 50,
                 BILLAM: 46,
                 BILLPAID: 50,
-                PAIDDT: 78,
-                ExpDate: 46,
-                FUrutan: 22,
+                PAIDDT: 72,
+                ExpDate: 42,
+                FUrutan: 'auto',
             },
         };
 

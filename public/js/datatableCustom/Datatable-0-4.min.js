@@ -487,6 +487,94 @@ function appendExcelCurrencyTotalRow(xlsx, sheet, dataColumns, options = {}) {
     }
 }
 
+function pdfCellText(cell) {
+    if (cell == null) {
+        return '';
+    }
+    if (typeof cell === 'string' || typeof cell === 'number') {
+        return String(cell);
+    }
+    if (typeof cell === 'object') {
+        if (Array.isArray(cell.text)) {
+            return cell.text.map(pdfCellText).join(' ');
+        }
+        return String(cell.text ?? '');
+    }
+    return '';
+}
+
+function parsePdfCurrencyValue(text) {
+    const raw = String(text || '').replace(/[^\d,-]/g, '').replace(/\./g, '').replace(',', '.');
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : 0;
+}
+
+function formatPdfRupiah(amount) {
+    const value = Math.round(Number(amount) || 0);
+    const abs = Math.abs(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (value < 0 ? 'Rp. -' : 'Rp. ') + abs;
+}
+
+function appendPdfCurrencyTotalRow(tableNode, dataColumns) {
+    const exportable = (dataColumns || []).filter((col) => col.exportable === true);
+    const body = tableNode?.table?.body;
+    if (!exportable.length || !Array.isArray(body) || body.length < 2) {
+        return;
+    }
+
+    const currencyIndexes = [];
+    exportable.forEach((col, idx) => {
+        const type = String(col.columnType || '').toLowerCase();
+        if (type === 'currency' || type === 'money' || type === 'rupiah') {
+            currencyIndexes.push(idx);
+        }
+    });
+    if (!currencyIndexes.length) {
+        return;
+    }
+
+    const colCount = body[0].length;
+    const totals = {};
+    currencyIndexes.forEach((idx) => {
+        totals[idx] = 0;
+    });
+
+    for (let r = 1; r < body.length; r++) {
+        const row = body[r] || [];
+        currencyIndexes.forEach((idx) => {
+            totals[idx] += parsePdfCurrencyValue(pdfCellText(row[idx]));
+        });
+    }
+
+    const totalRow = [];
+    for (let i = 0; i < colCount; i++) {
+        if (i === 0) {
+            totalRow.push({
+                text: 'TOTAL',
+                bold: true,
+                fillColor: '#ededed',
+                alignment: 'left',
+            });
+            continue;
+        }
+        if (currencyIndexes.includes(i)) {
+            totalRow.push({
+                text: formatPdfRupiah(totals[i]),
+                bold: true,
+                fillColor: '#ededed',
+                alignment: 'right',
+            });
+            continue;
+        }
+        totalRow.push({
+            text: '',
+            bold: true,
+            fillColor: '#ededed',
+        });
+    }
+    body.push(totalRow);
+}
+
 function getVerticalTopStyleForCell(xlsx, cell) {
     const stylesXml = xlsx.xl['styles.xml'];
     const cellXfs = stylesXml.getElementsByTagName('cellXfs')[0];
@@ -812,8 +900,8 @@ function dtButtons(options, buttons) {
                     if (options.pdfColumnWidths && exportableColumns.length === colCount) {
                         widths = exportableColumns.map(col => {
                             const configured = options.pdfColumnWidths[col.data ?? 'no'];
-                            if (configured === '*') {
-                                return '*';
+                            if (configured === '*' || configured === 'auto') {
+                                return configured;
                             }
                             if (typeof configured === 'number') {
                                 return configured;
@@ -833,9 +921,9 @@ function dtButtons(options, buttons) {
                         ));
                     }
 
-                    if (!widths.includes('*')) {
+                    if (!widths.includes('*') && !widths.includes('auto')) {
                         const numericSum = widths.reduce((sum, width) => sum + Number(width || 0), 0);
-                        if (numericSum > 0 && Math.abs(numericSum - usableWidth) > 1) {
+                        if (numericSum > usableWidth) {
                             const scale = usableWidth / numericSum;
                             widths = widths.map(width => Math.max(14, Number(width) * scale));
                         }
@@ -859,6 +947,9 @@ function dtButtons(options, buttons) {
                         paddingTop: () => pad,
                         paddingBottom: () => pad,
                     };
+                    if (options.pdfCurrencyTotal || options.excelCurrencyTotal) {
+                        appendPdfCurrencyTotalRow(tableNode, options.dataColumns);
+                    }
                 }
                 const duplicateCols = getDuplicateExportColumns(options.dataColumns);
                 mergePdfDuplicates(doc, duplicateCols);

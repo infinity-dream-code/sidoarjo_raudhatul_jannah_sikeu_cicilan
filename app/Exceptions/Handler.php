@@ -2,8 +2,11 @@
 
 namespace App\Exceptions;
 
+use App\Support\PersistentLogin;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Facades\Auth;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -31,6 +34,27 @@ class Handler extends ExceptionHandler
 
     public function render($request, Throwable $e)
     {
+        if ($e instanceof AuthenticationException) {
+            try {
+                if (!Auth::check()) {
+                    PersistentLogin::restore();
+                }
+            } catch (Throwable) {
+            }
+
+            if (Auth::check()) {
+                return redirect()->to($request->fullUrl());
+            }
+
+            if (PersistentLogin::hasCookie()) {
+                return response()->view('errors.500', [], 500);
+            }
+        }
+
+        if (PersistentLogin::isTransient($e) && $request->isMethod('GET') && !$request->expectsJson()) {
+            return response()->view('errors.500', [], 500);
+        }
+
         if ($e instanceof TokenMismatchException) {
             try {
                 if ($request->hasSession()) {

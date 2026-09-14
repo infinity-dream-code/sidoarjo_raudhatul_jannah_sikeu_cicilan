@@ -59,12 +59,7 @@ class PersistentLogin
             return true;
         }
 
-        $raw = request()->cookie(self::COOKIE);
-        if (!is_string($raw) || $raw === '') {
-            return false;
-        }
-
-        $data = json_decode($raw, true);
+        $data = self::readCookiePayload();
         if (!is_array($data)) {
             return false;
         }
@@ -74,12 +69,7 @@ class PersistentLogin
             return false;
         }
 
-        try {
-            $user = CyberKey::query()->where('urut', $urut)->first();
-        } catch (Throwable) {
-            return false;
-        }
-
+        $user = self::findUser($urut);
         if (!$user instanceof CyberKey) {
             return false;
         }
@@ -92,10 +82,18 @@ class PersistentLogin
             return false;
         }
 
-        Auth::login($user, false);
-        self::set($user);
+        try {
+            Auth::login($user, false);
+        } catch (Throwable) {
+            Auth::setUser($user);
+        }
 
-        return true;
+        try {
+            self::set($user);
+        } catch (Throwable) {
+        }
+
+        return Auth::user() instanceof CyberKey;
     }
 
     public static function isTransient(Throwable $e): bool
@@ -113,7 +111,17 @@ class PersistentLogin
             'serialization failure',
             'try restarting transaction',
             'no active transaction',
+            'being used by another process',
+            'failed to open stream',
+            'permission denied',
+            'unable to retrieve the session',
+            'session store not set on request',
+            'connection refused',
+            'too many connections',
+            'packets out of order',
             'sqlstate[40001]',
+            'sqlstate[hy000] [2002]',
+            'sqlstate[hy000] [2006]',
             'sqlstate[hy000]: general error: 1205',
             'sqlstate[hy000]: general error: 2006',
             'sqlstate[hy000]: general error: 2013',
@@ -127,6 +135,51 @@ class PersistentLogin
         $previous = $e->getPrevious();
 
         return $previous instanceof Throwable && self::isTransient($previous);
+    }
+
+    public static function hasCookie(): bool
+    {
+        return self::readCookiePayload() !== null;
+    }
+
+    private static function readCookiePayload(): ?array
+    {
+        $raw = request()->cookie(self::COOKIE);
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        $data = json_decode($raw, true);
+        if (is_array($data)) {
+            return $data;
+        }
+
+        try {
+            $decrypted = app('encrypter')->decrypt($raw, false);
+            $data = json_decode((string) $decrypted, true);
+
+            return is_array($data) ? $data : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private static function findUser(int $urut): ?CyberKey
+    {
+        $attempts = 0;
+        do {
+            try {
+                return CyberKey::query()->where('urut', $urut)->first();
+            } catch (Throwable $e) {
+                if (!self::isTransient($e) || $attempts >= 1) {
+                    return null;
+                }
+                usleep(80000);
+                $attempts++;
+            }
+        } while ($attempts < 2);
+
+        return null;
     }
 
     private static function stamp(CyberKey $user): string

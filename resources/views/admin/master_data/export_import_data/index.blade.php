@@ -225,9 +225,9 @@
 
         let dtOptions = {
             tableId: 'main_table',
-            formId: 'filterForm',
-            columnUrl: '{{($columnsUrl??null)}}?v=20260903',
-            dataUrl: '{{($datasUrl??null)}}?v=20260604',
+            formId: null,
+            columnUrl: '{{($columnsUrl??null)}}?v=20260914',
+            dataUrl: '{{($datasUrl??null)}}?v=20260914',
             dataColumns: [],
             thead: true,
             tfoot: true,

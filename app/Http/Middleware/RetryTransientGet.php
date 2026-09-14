@@ -23,6 +23,7 @@ class RetryTransientGet
             }
 
             $request->attributes->set('_transient_retried', true);
+            usleep(80000);
 
             return $next($request);
         }

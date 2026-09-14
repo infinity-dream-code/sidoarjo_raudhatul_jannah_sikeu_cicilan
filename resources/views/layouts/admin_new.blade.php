@@ -451,12 +451,13 @@
             sessionPingWait = originalFetch(sessionPingUrl, {
                 method: 'GET',
                 credentials: 'same-origin',
+                redirect: 'manual',
                 headers: {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                 },
             }).then(function (response) {
-                if (!response.ok) {
+                if (!response.ok || response.type === 'opaqueredirect') {
                     return currentCsrf();
                 }
                 return response.json();

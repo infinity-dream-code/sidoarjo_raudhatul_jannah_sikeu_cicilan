@@ -69,61 +69,46 @@ class ExportImportDataController extends Controller
 
     public function getData(Request $request)
     {
-        $draw = $request->get('draw');
-        $start = $request->get('start');
-        $rowperpage = $request->get('length');
-
-        $columnName_arr = $request->get('columns');
-        $search_arr = $request->get('search');
-
-        $defaultColumn = 'scctcust.nocust';
-        $defaultOrder = 'asc';
-
-        if ($request->has('order')) {
-            $columnIndex_arr = $request->get('order');
-            $columnIndex = $columnIndex_arr[0]['column'];
-            $columnSortOrder = $columnIndex_arr[0]['dir'];
-        } else {
-            $columnIndex = $defaultColumn;
-            $columnSortOrder = $defaultOrder;
+        $draw = (int) $request->get('draw', 1);
+        $start = max(0, (int) $request->get('start', 0));
+        $rowperpage = (int) $request->get('length', 10);
+        if ($rowperpage < 1) {
+            $rowperpage = 10;
         }
 
-        $columnName = $columnName_arr[$columnIndex]['data'];
-        $searchValue = $search_arr['value'];
-
-        if (!$columnName || $columnName == 'no') {
-            $columnName = $defaultColumn;
-            $columnSortOrder = $defaultOrder;
+        try {
+            $cached = Cache::get($this->cacheKey, []);
+            $cachedData = collect(is_array($cached) ? $cached : []);
+        } catch (\Throwable $e) {
+            Log::warning('export_import_data.getData.cache_failed', [
+                'message' => $e->getMessage(),
+            ]);
+            $cachedData = collect();
         }
 
-        $filters = [];
-        $filterQuery = null;
+        $searchValue = trim((string) data_get($request->get('search'), 'value', ''));
+        if ($searchValue !== '') {
+            $needle = mb_strtolower($searchValue);
+            $cachedData = $cachedData->filter(function ($item) use ($needle) {
+                if (!is_array($item)) {
+                    return false;
+                }
+                foreach (['nis', 'nodaftar', 'nama', 'unit', 'kelas', 'kelompok', 'angkatan', 'keterangan'] as $field) {
+                    if (str_contains(mb_strtolower((string) ($item[$field] ?? '')), $needle)) {
+                        return true;
+                    }
+                }
 
-        $cachedData = collect(Cache::get($this->cacheKey) ?? []);
+                return false;
+            })->values();
+        }
+
         $paginatedData = $cachedData->slice($start, $rowperpage)->values();
+        $records = $paginatedData->map(function ($item) {
+            $item = is_array($item) ? $item : [];
 
-
-        $nisList = collect($cachedData)->pluck('nis')->toArray();
-        $nisCount = count($cachedData);
-
-        $whereAny = [
-            'scctcust.NMCUST',
-            'scctcust.NOCUST',
-        ];
-
-        $select = array_unique(array_merge($whereAny, [
-            'scctcust.NUM2ND',
-            'scctcust.CODE02',
-            'scctcust.DESC02',
-            'scctcust.DESC03',
-            'scctcust.DESC04',
-
-        ]));
-
-        $records = collect($paginatedData)->map(function ($item) {
-            $nis = $item['nis'];
             return [
-                'nis' => $nis,
+                'nis' => $item['nis'] ?? null,
                 'nodaftar' => $item['nodaftar'] ?? null,
                 'name' => $item['nama'] ?? null,
                 'unit' => $item['unit'] ?? null,
@@ -135,17 +120,16 @@ class ExportImportDataController extends Controller
                 'alamat' => $item['alamat'] ?? null,
                 'no_wa' => $item['no_wa'] ?? null,
                 'status' => $item['status'] ?? 0,
-                'keterangan' => $item['keterangan'],
+                'keterangan' => $item['keterangan'] ?? null,
             ];
         });
 
-        $response = array(
-            'draw' => intval($draw),
-            'recordsTotal' => $nisCount,
-            'recordsFiltered' => $nisCount,
+        return response()->json([
+            'draw' => $draw,
+            'recordsTotal' => $cachedData->count(),
+            'recordsFiltered' => $cachedData->count(),
             'data' => $records,
-        );
-        return response()->json($response);
+        ]);
     }
 
     public function store(Request $request)

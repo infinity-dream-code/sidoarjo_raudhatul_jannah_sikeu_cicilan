@@ -1674,8 +1674,8 @@
                     // PDF definition
                     const docDefinition = {
                         info: {
-                            title: String(title || 'KARTU TAGIHAN SISWA').toUpperCase(),
-                            subject: 'KARTU TAGIHAN SISWA'
+                            title: String(title || 'Cetak Kartu Siswa - Data Tagihan').toUpperCase(),
+                            subject: 'Cetak Kartu Siswa - Data Tagihan'
                         },
                         pageSize: 'A4',
                         pageOrientation: orientation,
@@ -1742,7 +1742,7 @@
                         throw createError("Data Tagihan Kosong", 422);
                     }
                     const data = await generateKartuSiswa(result);
-                    const pdf = await generatePdf('KARTU TAGIHAN SISWA', data, unit)
+                    const pdf = await generatePdf('Cetak Kartu Siswa - Data Tagihan', data, unit)
                     // if (!result['tagihans'] || result['tagihans'].length === 0) {
                     //     console.log('kosong');
                     //     const error = new Error("Data Tagihan Kosong");

@@ -154,10 +154,6 @@
                     </div>
                     <div class="row">
                         <div class="d-flex justify-content-center justify-content-md-end gap-4">
-                            <button type="button" class="btn btn-whatsapp" id="btn-reset-android-selected">
-                                <span class="ri-android-line me-2"></span>
-                                Reset Login Android
-                            </button>
                             <button type="reset" class="btn btn-secondary">
                                 <span class="ri-reset-left-line me-2"></span>
                                 Reset
@@ -772,9 +768,6 @@
         document.addEventListener("DOMContentLoaded", function () {
             if (dtOptions.dataUrl && dtOptions.columnUrl) {
                 getDT(dtOptions);
-                $(`#${dtOptions.tableId}`).on('draw.dt', function () {
-                    syncResetAndroidCheckboxes();
-                });
                 if (dtOptions.formId) {
                     let filterForm = $(`#${dtOptions.formId}`);
                     filterForm.on('submit', function (e) {
@@ -964,7 +957,7 @@
                 }
             });
 
-            document.getElementById('btn-reset-android-selected').addEventListener('click', async function () {
+            document.getElementById('btn-reset-android-selected')?.addEventListener('click', async function () {
                 const ids = Array.from(selectedResetAndroidIds);
                 if (ids.length === 0) {
                     warningAlert('Pilih siswa dulu untuk reset android.');

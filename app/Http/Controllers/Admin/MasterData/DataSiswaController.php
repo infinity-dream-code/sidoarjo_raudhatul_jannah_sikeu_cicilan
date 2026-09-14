@@ -78,7 +78,6 @@ class DataSiswaController extends Controller
     public function getColumn()
     {
         return [
-            ["data" => "select_reset", "name" => "", "searchable" => false, "orderable" => false, "className" => "text-center", "exportable" => false],
             ["data" => null, "name" => "no", "className" => "text-center", "columnType" => "row", "exportable" => true],
             ["data" => "nocust", "name" => "NIS", "searchable" => true, "orderable" => true, "exportable" => true],
             ["data" => "va_spp", "name" => "VA SPP", "searchable" => false, "orderable" => false, "exportable" => true],
@@ -287,7 +286,6 @@ class DataSiswaController extends Controller
                 $hasNis = $normalized !== '';
                 $link = $hasNis ? ($activeLinks->get($normalized)) : null;
                 $row["item_id"] = $item->CUSTID;
-                $row["select_reset"] = '<input type="checkbox" class="form-check-input reset-android-row" value="' . e((string) $item->CUSTID) . '">';
                 $row["nis"] = $item->nocust;
                 $row["va_spp"] = ($nis !== '' && $nis !== '-')
                     ? scctcust::showVASpp($nis)

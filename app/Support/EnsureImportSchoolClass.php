@@ -7,17 +7,30 @@ use App\Models\mst_sekolah;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Saat import siswa, unit/kelas Excel yang belum ada di master
- * dibuatkan otomatis: mst_sekolah (jika perlu) + mst_kelas.
+ * Import siswa: Excel UNIT = mst_sekolah.DESC01 + mst_kelas.unit
+ * Excel KELAS = mst_kelas.jenjang
+ * Excel KELOMPOK = mst_kelas.kelas
+ * mst_kelas.kelompok = mst_sekolah.CODE01 (increment, contoh 104 → 105)
  */
 class EnsureImportSchoolClass
 {
-    public static function resolve(
-        ?string $unit,
-        mixed $jenjang,
-        ?string $kelompok,
-        ?mst_sekolah $preferredSekolah = null,
-    ): array {
+    /** @var array<string, mst_sekolah> */
+    private static array $sekolahMemo = [];
+
+    /** @var array<string, mst_kelas> */
+    private static array $kelasMemo = [];
+
+    public static function resetMemo(): void
+    {
+        self::$sekolahMemo = [];
+        self::$kelasMemo = [];
+    }
+
+    /**
+     * @return array{0: ?mst_sekolah, 1: ?mst_kelas}
+     */
+    public static function resolve(?string $unit, mixed $jenjang, ?string $kelompok): array
+    {
         $unit = trim((string) $unit);
         $jenjangText = trim((string) $jenjang);
         $kelompok = trim((string) $kelompok);
@@ -26,57 +39,106 @@ class EnsureImportSchoolClass
             return [null, null];
         }
 
-        $sekolah = self::ensureSekolah($unit, $preferredSekolah);
-        $kelas = self::ensureKelas($unit, $jenjangText, $kelompok, $sekolah);
+        $sekolah = self::ensureSekolah($unit);
+        $kelas = $sekolah ? self::ensureKelas($unit, $jenjangText, $kelompok, $sekolah) : null;
 
         return [$sekolah, $kelas];
     }
 
-    public static function ensureSekolah(?string $unit, ?mst_sekolah $preferred = null): ?mst_sekolah
+    public static function ensureSekolah(string $unit): ?mst_sekolah
     {
-        $unit = trim((string) $unit);
-        $scopedCode = SchoolScope::codeFromUser();
-        if ($scopedCode) {
-            $scoped = mst_sekolah::query()->where('CODE01', $scopedCode)->first();
-            if ($scoped) {
-                return $scoped;
+        $unit = trim($unit);
+        if ($unit === '') {
+            return null;
+        }
+
+        $memoKey = strtoupper($unit);
+        if (isset(self::$sekolahMemo[$memoKey])) {
+            return self::$sekolahMemo[$memoKey];
+        }
+
+        $existing = mst_sekolah::query()
+            ->where(function ($query) use ($unit) {
+                $query->whereRaw('UPPER(TRIM(DESC01)) = ?', [strtoupper($unit)])
+                    ->orWhereRaw('CAST(CODE01 AS CHAR) = ?', [$unit]);
+            })
+            ->first();
+
+        if ($existing) {
+            self::$sekolahMemo[$memoKey] = $existing;
+
+            return $existing;
+        }
+
+        $kelasUnit = mst_kelas::query()
+            ->whereRaw('UPPER(TRIM(unit)) = ?', [strtoupper($unit)])
+            ->whereNotNull('kelompok')
+            ->orderBy('id')
+            ->first();
+        if ($kelasUnit) {
+            $fromKelas = mst_sekolah::query()
+                ->whereRaw('CAST(CODE01 AS CHAR) = ?', [trim((string) $kelasUnit->kelompok)])
+                ->first();
+            if ($fromKelas) {
+                self::$sekolahMemo[$memoKey] = $fromKelas;
+
+                return $fromKelas;
             }
         }
 
-        $fromUnit = $unit !== '' ? self::findSekolahByUnit($unit) : null;
-        if (!$fromUnit && $unit !== '') {
-            $fromUnit = self::createSekolah($unit);
-        }
+        $code = self::nextSekolahCode();
+        $urut = (int) (mst_sekolah::query()->max('urut') ?? 0) + 1;
 
-        return $preferred ?? $fromUnit;
+        $sekolah = new mst_sekolah();
+        $sekolah->urut = $urut;
+        $sekolah->CODE01 = $code;
+        $sekolah->DESC01 = $unit;
+        $sekolah->save();
+        $sekolah = $sekolah->fresh() ?? $sekolah;
+
+        Log::info('import_siswa.auto_create_sekolah', [
+            'CODE01' => $code,
+            'DESC01' => $unit,
+            'urut' => $urut,
+        ]);
+
+        self::$sekolahMemo[$memoKey] = $sekolah;
+
+        return $sekolah;
     }
 
     public static function ensureKelas(
         string $unit,
         string $jenjang,
         string $kelompok,
-        ?mst_sekolah $sekolah,
+        mst_sekolah $sekolah,
     ): ?mst_kelas {
-        $existing = mst_kelas::findForImport($unit, $jenjang, $kelompok);
-        if ($existing) {
-            return $existing;
-        }
-
-        if (!$sekolah) {
-            return null;
-        }
-
-        $jenjangValue = is_numeric($jenjang) ? (string) (int) $jenjang : $jenjang;
+        $jenjangValue = is_numeric($jenjang) ? (string) (int) $jenjang : trim($jenjang);
         $schoolCode = trim((string) $sekolah->CODE01);
+        $memoKey = strtoupper($unit.'|'.$jenjangValue.'|'.$kelompok.'|'.$schoolCode);
 
-        $duplicate = mst_kelas::query()
+        if (isset(self::$kelasMemo[$memoKey])) {
+            return self::$kelasMemo[$memoKey];
+        }
+
+        $existing = mst_kelas::query()
             ->whereRaw('UPPER(TRIM(unit)) = ?', [strtoupper($unit)])
             ->whereRaw('UPPER(TRIM(jenjang)) = ?', [strtoupper($jenjangValue)])
             ->whereRaw('UPPER(TRIM(kelas)) = ?', [strtoupper($kelompok)])
-            ->when($schoolCode !== '', fn ($q) => $q->where('kelompok', $schoolCode))
+            ->where(function ($query) use ($schoolCode) {
+                $query->where('kelompok', $schoolCode)
+                    ->orWhereRaw('CAST(kelompok AS CHAR) = ?', [$schoolCode]);
+            })
             ->first();
-        if ($duplicate) {
-            return $duplicate;
+
+        if (!$existing) {
+            $existing = mst_kelas::findForImport($unit, $jenjangValue, $kelompok);
+        }
+
+        if ($existing) {
+            self::$kelasMemo[$memoKey] = $existing;
+
+            return $existing;
         }
 
         $nextId = (int) (mst_kelas::query()->max('id') ?? 0) + 1;
@@ -88,75 +150,36 @@ class EnsureImportSchoolClass
         $kelas->kelas = $kelompok;
         $kelas->kelompok = $schoolCode;
         $kelas->save();
+        $kelas = $kelas->fresh() ?? $kelas;
 
         Log::info('import_siswa.auto_create_kelas', [
             'id' => $kelas->id,
             'unit' => $unit,
             'jenjang' => $jenjangValue,
             'kelas' => $kelompok,
-            'sekolah' => $schoolCode,
+            'kelompok' => $schoolCode,
         ]);
 
-        return $kelas->fresh() ?? $kelas;
+        self::$kelasMemo[$memoKey] = $kelas;
+
+        return $kelas;
     }
 
-    private static function createSekolah(string $unit): mst_sekolah
+    private static function nextSekolahCode(): string
     {
-        $code = self::nextSekolahCode($unit);
-        $urut = (int) (mst_sekolah::query()->max('urut') ?? 0) + 1;
-
-        $sekolah = new mst_sekolah();
-        $sekolah->urut = $urut;
-        $sekolah->CODE01 = $code;
-        $sekolah->DESC01 = $unit;
-        $sekolah->save();
-
-        Log::info('import_siswa.auto_create_sekolah', [
-            'CODE01' => $code,
-            'DESC01' => $unit,
-            'urut' => $urut,
-        ]);
-
-        return $sekolah->fresh() ?? $sekolah;
-    }
-
-    private static function findSekolahByUnit(string $unit): ?mst_sekolah
-    {
-        return mst_sekolah::query()
-            ->where(function ($query) use ($unit) {
-                $query->where('CODE01', $unit)
-                    ->orWhereRaw('UPPER(TRIM(DESC01)) = ?', [strtoupper($unit)])
-                    ->orWhere('DESC01', 'like', '%' . $unit . '%');
-            })
-            ->first();
-    }
-
-    private static function nextSekolahCode(string $unitName): string
-    {
-        $slug = strtoupper((string) preg_replace('/[^A-Z0-9]/i', '', $unitName));
-        if ($slug !== '' && strlen($slug) <= 20 && !mst_sekolah::query()->where('CODE01', $slug)->exists()) {
-            return $slug;
-        }
-
-        $numericMax = mst_sekolah::query()
-            ->pluck('CODE01')
-            ->filter(fn ($code) => ctype_digit(trim((string) $code)))
-            ->map(fn ($code) => (int) $code)
-            ->max();
-
-        if ($numericMax) {
-            $next = (string) ($numericMax + 1);
-            if (!mst_sekolah::query()->where('CODE01', $next)->exists()) {
-                return $next;
+        $max = 100;
+        foreach (mst_sekolah::query()->pluck('CODE01') as $code) {
+            $digits = trim((string) $code);
+            if ($digits !== '' && ctype_digit($digits)) {
+                $max = max($max, (int) $digits);
             }
         }
 
-        $n = 1;
-        do {
-            $code = 'U' . str_pad((string) $n, 3, '0', STR_PAD_LEFT);
-            $n++;
-        } while (mst_sekolah::query()->where('CODE01', $code)->exists());
+        $next = $max + 1;
+        while (mst_sekolah::query()->where('CODE01', (string) $next)->exists()) {
+            $next++;
+        }
 
-        return $code;
+        return (string) $next;
     }
 }

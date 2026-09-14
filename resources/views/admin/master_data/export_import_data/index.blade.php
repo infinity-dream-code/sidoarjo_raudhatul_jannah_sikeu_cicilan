@@ -103,7 +103,7 @@
                             <li class="list-group-item list-group-timeline-danger">File harus berformat <span class="fw-bold">XLS/XLSX</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Ukuran file tidak boleh lebih dari <span class="fw-bold">1024KB/1MB</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">Nama, Unit, Kelas, Kelompok, Angkatan</span> plus <span class="fw-bold">NIS</span> atau <span class="fw-bold">NODAFTAR</span>.</li>
-                            <li class="list-group-item list-group-timeline-primary">Jika Unit/Kelas/Kelompok belum ada di Master Kelas, sistem akan membuatnya otomatis saat <span class="fw-bold">Simpan Data</span> (termasuk Unit baru di master sekolah bila belum terdaftar).</li>
+                            <li class="list-group-item list-group-timeline-primary">Tidak perlu pilih sekolah saat simpan. Unit baru (contoh <span class="fw-bold">MAHAD</span>) otomatis masuk <span class="fw-bold">mst_sekolah</span> dengan kode berikutnya (104 → 105), lalu <span class="fw-bold">mst_kelas.kelompok</span> = kode itu, dan siswa masuk <span class="fw-bold">scctcust</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Kolom opsional: <span class="fw-bold">Gender, Alamat, Ortu, NO_WA</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Yang diimpor adalah <span class="fw-bold">sheet yang sedang aktif</span> saat file Excel disimpan (bukan selalu sheet paling kiri).</li>
                             <li class="list-group-item list-group-timeline-danger">Contoh file yang dapat diproses untuk import:
@@ -163,21 +163,11 @@
                             </div>
                         </div>
                         <fieldset class="form-fieldset">
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <label class="form-label" for="sekolah">Sekolah <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="sekolah" name="sekolah"
-                                            data-control="select2"
-                                            data-placeholder="Pilih Sekolah">
-                                        <option value="" disabled selected>Pilih Sekolah</option>
-                                        @isset($sekolah)
-                                            @foreach($sekolah as $item)
-                                                <option value="{{ $item->CODE01 }}">{{ $item->DESC01 }}</option>
-                                            @endforeach
-                                        @endisset
-                                    </select>
-                                </div>
-                            </div>
+                            <p class="text-muted small mb-3">
+                                Unit/kelas diambil dari Excel. Jika belum ada, sistem membuat
+                                <b>mst_sekolah</b> (kode +1, contoh 104 → 105) dan
+                                <b>mst_kelas</b> (kelompok = kode sekolah), lalu menyimpan siswa ke <b>scctcust</b>.
+                            </p>
                             <div class="row mb-3">
                                 <div class="col">
                                     <label class="form-label" for="metode">Metode Penyimpanan <span class="text-danger">*</span></label>
@@ -379,13 +369,6 @@
                     });
                 });
             }
-
-            document.getElementById('metode')?.addEventListener('change', function () {
-                const sekolahField = document.getElementById('sekolah');
-                if (!sekolahField) return;
-                const needsSekolah = ['1', '2'].includes(this.value);
-                sekolahField.required = needsSekolah;
-            });
 
             document.querySelectorAll(".mainForm").forEach(form => {
                 form.addEventListener("submit", function (e) {

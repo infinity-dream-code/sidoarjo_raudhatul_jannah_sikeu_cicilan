@@ -135,7 +135,8 @@ class ImportDataSiswa implements WithMultipleSheets, ToCollection, WithHeadingRo
                 $status_ket = $this->appendKet(
                     $status_ket,
                     sprintf(
-                        'Unit/kelas belum ada di Master Kelas (Unit: %s, Kelas: %s, Kelompok: %s). Akan dibuat otomatis saat simpan.',
+                        'Unit/kelas belum ada. Saat simpan akan dibuat mst_sekolah (kode +1, nama %s) dan mst_kelas (Unit: %s, Kelas: %s, Kelompok Excel: %s; mst_kelas.kelompok = kode sekolah).',
+                        $rowData['unit'],
                         $rowData['unit'],
                         $rowData['kelas'],
                         $rowData['kelompok'],

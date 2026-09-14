@@ -15,4 +15,6 @@ class mst_sekolah extends Model
     public $timestamps = false;
 
     public $incrementing = false;
+
+    protected $guarded = [];
 }

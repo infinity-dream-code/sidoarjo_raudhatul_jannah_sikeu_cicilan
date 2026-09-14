@@ -213,9 +213,6 @@ class ExportImportDataController extends Controller
         $rules = [
             'metode' => ['required', 'in:1,2,3,4'],
         ];
-        if (in_array($request->metode, ['1', '2'], true)) {
-            $rules['sekolah'] = ['required', 'string'];
-        }
 
         $request->validate(
             $rules,
@@ -228,13 +225,7 @@ class ExportImportDataController extends Controller
             return response()->json(['message' => 'Tidak ada data yang dapat diproses, silahkan upload file terlebih dahulu'], 422);
         }
 
-        $sekolah = null;
-        if (in_array($request->metode, ['1', '2'], true)) {
-            $sekolah = mst_sekolah::where('CODE01', $request->sekolah)->first();
-            if (!$sekolah) {
-                return response()->json(['message' => 'Sekolah tidak ditemukan, silahkan pilih sekolah yang valid'], 422);
-            }
-        }
+        EnsureImportSchoolClass::resetMemo();
 
         try {
             // Metode 1 memakai stored procedure InputSiswa yang sudah COMMIT sendiri.
@@ -274,13 +265,11 @@ class ExportImportDataController extends Controller
                         ], 422);
                     }
 
-                    [$sekolahRow, $kelas] = EnsureImportSchoolClass::resolve(
+                    [$sekolah, $kelas] = EnsureImportSchoolClass::resolve(
                         $item['unit'] ?? null,
                         $item['kelas'] ?? null,
                         $item['kelompok'] ?? null,
-                        $sekolah,
                     );
-                    $sekolah = $sekolahRow ?? $sekolah;
 
                     if (!$kelas || !$sekolah) {
                         return response()->json([
@@ -289,17 +278,28 @@ class ExportImportDataController extends Controller
                         ], 422);
                     }
 
-                    InputSiswaProcedure::call(
-                        $nis,
-                        (string) ($item['nama'] ?? ''),
-                        $kelas,
-                        $sekolah,
-                        (string) ($item['angkatan'] ?? ''),
-                        $item['alamat'] ?? null,
-                        $item['gender'] ?? null,
-                        $this->resolveOrtuForDb($item),
-                    );
+                    $alreadyExists = scctcust::query()->where('NOCUST', $nis)->exists();
+                    if (!$alreadyExists) {
+                        try {
+                            InputSiswaProcedure::call(
+                                $nis,
+                                (string) ($item['nama'] ?? ''),
+                                $kelas,
+                                $sekolah,
+                                (string) ($item['angkatan'] ?? ''),
+                                $item['alamat'] ?? null,
+                                $item['gender'] ?? null,
+                                $this->resolveOrtuForDb($item),
+                            );
+                        } catch (\Throwable $procedureError) {
+                            Log::warning('export_import_data.input_siswa_procedure_skipped', [
+                                'nis' => $nis,
+                                'message' => $procedureError->getMessage(),
+                            ]);
+                        }
+                    }
 
+                    $this->upsertImportedCustomer($item, $sekolah, $kelas, $thnAka);
                     $this->syncNoWa($item, 'NOCUST', $nis);
 
                     $saved++;
@@ -330,13 +330,11 @@ class ExportImportDataController extends Controller
                         ], 422);
                     }
 
-                    [$sekolahRow, $kelas] = EnsureImportSchoolClass::resolve(
+                    [$sekolah, $kelas] = EnsureImportSchoolClass::resolve(
                         $item['unit'] ?? null,
                         $item['kelas'] ?? null,
                         $item['kelompok'] ?? null,
-                        $sekolah,
                     );
-                    $sekolah = $sekolahRow ?? $sekolah;
 
                     if (!$kelas || !$sekolah) {
                         Log::warning('export_import_data.validateData.missing_reference', [
@@ -388,15 +386,16 @@ class ExportImportDataController extends Controller
                     }
 
                     $existingCust = scctcust::where('NOCUST', $item['nis'])->first();
-                    [, $kelas] = EnsureImportSchoolClass::resolve(
+                    [$sekolah, $kelas] = EnsureImportSchoolClass::resolve(
                         $item['unit'] ?? null,
                         $item['kelas'] ?? null,
                         $item['kelompok'] ?? null,
-                        $sekolah,
                     );
 
-                    if ($existingCust && $kelas) {
+                    if ($existingCust && $kelas && $sekolah) {
                         $existingCust->update([
+                            'CODE01' => $sekolah->CODE01,
+                            'DESC01' => $sekolah->DESC01,
                             'CODE02' => $kelas->unit,
                             'DESC02' => $kelas->jenjang,
                             'CODE03' => $kelas->id,
@@ -536,6 +535,31 @@ class ExportImportDataController extends Controller
         $second = trim((string) ($item['ibu'] ?? ''));
 
         return $second !== '' ? $second : null;
+    }
+
+    private function upsertImportedCustomer(
+        array $item,
+        mst_sekolah $sekolah,
+        mst_kelas $kelas,
+        mst_thn_aka $thnAka,
+    ): void {
+        $nis = trim((string) ($item['nis'] ?? ''));
+        $nodaftar = trim((string) ($item['nodaftar'] ?? ''));
+
+        $existing = null;
+        if ($nis !== '') {
+            $existing = scctcust::query()->where('NOCUST', $nis)->first();
+        }
+        if (!$existing && $nodaftar !== '') {
+            $existing = scctcust::query()->where('NUM2ND', $nodaftar)->first();
+        }
+
+        if ($existing) {
+            $existing->update($this->buildScctcustPayload($item, $sekolah, $kelas, $thnAka, false, $existing));
+            return;
+        }
+
+        scctcust::create($this->buildScctcustPayload($item, $sekolah, $kelas, $thnAka));
     }
 
     private function resolveSekolahForImport(?string $unit, ?mst_kelas $kelas): ?mst_sekolah

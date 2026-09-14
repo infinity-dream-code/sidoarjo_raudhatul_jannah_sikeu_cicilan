@@ -1577,7 +1577,7 @@
                     return APP_VA_PREFIX + digits.padStart(padLen, '0');
                 })();
 
-            async function generatePdf(title, bodyContent, unit_logo = false) {
+            async function generatePdf(title, bodyContent, unit_logo = false, fileTitle = null) {
                 try {
                     let logo = 'data:image/jpeg;base64,' + headerLogo;
 
@@ -1672,10 +1672,11 @@
                     ];
 
                     // PDF definition
+                    const docTitle = String(fileTitle || title || 'Kartu Tagihan Siswa');
                     const docDefinition = {
                         info: {
-                            title: String(title || 'Cetak Kartu Siswa - Data Tagihan').toUpperCase(),
-                            subject: 'Cetak Kartu Siswa - Data Tagihan'
+                            title: docTitle.toUpperCase(),
+                            subject: docTitle
                         },
                         pageSize: 'A4',
                         pageOrientation: orientation,
@@ -1742,7 +1743,7 @@
                         throw createError("Data Tagihan Kosong", 422);
                     }
                     const data = await generateKartuSiswa(result);
-                    const pdf = await generatePdf('Cetak Kartu Siswa - Data Tagihan', data, unit)
+                    const pdf = await generatePdf('Kartu Tagihan Siswa', data, unit, 'Cetak Kartu Siswa - Data Tagihan')
                     // if (!result['tagihans'] || result['tagihans'].length === 0) {
                     //     console.log('kosong');
                     //     const error = new Error("Data Tagihan Kosong");

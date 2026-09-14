@@ -103,7 +103,7 @@
                             <li class="list-group-item list-group-timeline-danger">File harus berformat <span class="fw-bold">XLS/XLSX</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Ukuran file tidak boleh lebih dari <span class="fw-bold">1024KB/1MB</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">Nama, Unit, Kelas, Kelompok, Angkatan</span> plus <span class="fw-bold">NIS</span> atau <span class="fw-bold">NODAFTAR</span>.</li>
-                            <li class="list-group-item list-group-timeline-primary">Tidak perlu pilih sekolah saat simpan. Unit baru (contoh <span class="fw-bold">MAHAD</span>) otomatis masuk <span class="fw-bold">mst_sekolah</span> dengan kode berikutnya (104 → 105), lalu <span class="fw-bold">mst_kelas.kelompok</span> = kode itu, dan siswa masuk <span class="fw-bold">scctcust</span>.</li>
+                            <li class="list-group-item list-group-timeline-primary">Tidak perlu pilih sekolah saat simpan. Unit baru otomatis ditambahkan ke master sekolah dan master kelas, lalu data siswa ikut tersimpan.</li>
                             <li class="list-group-item list-group-timeline-danger">Kolom opsional: <span class="fw-bold">Gender, Alamat, Ortu, NO_WA</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Yang diimpor adalah <span class="fw-bold">sheet yang sedang aktif</span> saat file Excel disimpan (bukan selalu sheet paling kiri).</li>
                             <li class="list-group-item list-group-timeline-danger">Contoh file yang dapat diproses untuk import:
@@ -164,9 +164,7 @@
                         </div>
                         <fieldset class="form-fieldset">
                             <p class="text-muted small mb-3">
-                                Unit/kelas diambil dari Excel. Jika belum ada, sistem membuat
-                                <b>mst_sekolah</b> (kode +1, contoh 104 → 105) dan
-                                <b>mst_kelas</b> (kelompok = kode sekolah), lalu menyimpan siswa ke <b>scctcust</b>.
+                                Unit/kelas diambil dari Excel. Jika belum terdaftar, sistem menambahkannya ke master sekolah dan master kelas, lalu menyimpan data siswa.
                             </p>
                             <div class="row mb-3">
                                 <div class="col">

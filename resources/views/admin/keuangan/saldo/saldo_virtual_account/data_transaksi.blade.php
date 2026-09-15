@@ -90,7 +90,7 @@
 
 @section('script')
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260912-va-trx"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260915-export-filename"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
 
     <script type="text/javascript">
@@ -109,6 +109,8 @@
             pageLength: 25,
             lengthMenu: [25, 100],
             buttons: ['excel', 'pdf', 'print'],
+            excelFilename: 'saldo VA transaksi - export excel',
+            pdfFilename: 'saldo VA transaksi export pdf',
             pdfOrientation: 'landscape',
             pdfPageSize: 'A3',
             pdfMargins: [12, 12, 12, 12],

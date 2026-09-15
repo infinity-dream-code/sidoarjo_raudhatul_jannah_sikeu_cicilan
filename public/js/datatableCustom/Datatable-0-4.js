@@ -814,6 +814,7 @@ function dtButtons(options, buttons) {
         excel: {
             extend: 'excel',
             title: '',
+            filename: options.excelFilename || '*',
             text: '<i class="ri ri-file-excel-line me-2"></i>Excel',
             exportOptions: {
                 columns: ':visible:not(.no-export)'
@@ -850,6 +851,7 @@ function dtButtons(options, buttons) {
         pdf: {
             extend: 'pdf',
             title: '',
+            filename: options.pdfFilename || '*',
             text: '<i class="ri ri-file-pdf-2-line me-2"></i>Pdf',
             modifier: {page: 'all'},
             orientation: options.pdfOrientation || 'portrait',
@@ -929,6 +931,7 @@ function dtButtons(options, buttons) {
                         }
                     }
                     tableNode.table.widths = widths;
+                    tableNode.width = usableWidth;
 
                     const pad = options.pdfCellPadding ?? 1;
                     for (let rowIndex = 0; rowIndex < tableNode.table.body.length; rowIndex++) {

@@ -60,7 +60,8 @@ class ManualPembayaranController extends Controller
             ['data' => 'NOVA', 'name' => 'NO. VA', 'searchable' => true, 'orderable' => false, 'columnType' => 'nova_edit'],
             ['data' => 'nmcust', 'name' => 'NAMA', 'searchable' => true, 'orderable' => true],
             ['data' => 'BILLNM', 'name' => 'Nama Tagihan', 'searchable' => true, 'orderable' => true],
-            ['data' => 'BILLAC', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'columnType' => 'periode'],
+            ['data' => 'BILLAC', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'className' => 'text-center'],
+            ['data' => 'CICILAN', 'name' => 'Cicilan', 'searchable' => true, 'orderable' => true, 'className' => 'text-center'],
             ['data' => 'BILLAM', 'name' => 'Tagihan', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end'],
             ['data' => 'PAYMENTLEFT', 'name' => 'Sisa Tagihan', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end'],
             [
@@ -115,6 +116,7 @@ class ManualPembayaranController extends Controller
             }
 
             $periode = data_get($request->input('filter', []), 'periode', data_get($request->input('filter', []), 'tahun_pelajaran'));
+            $cicilanFilter = strtolower(trim((string) data_get($request->input('filter', []), 'cicilan', 'all')));
 
             $whereAny = [
                 'scctcust.nmcust',
@@ -178,13 +180,23 @@ class ManualPembayaranController extends Controller
                     $item->PAYMENTLEFT = $this->resolvePaymentLeft($item);
                     $item->sisa_bayar = $item->PAYMENTLEFT;
                     $item->can_cicil = ((int) ($item->isINSTALLABLE ?? 0) === 1 || mst_tagihan::canInstallment($item->BILLNM)) ? 1 : 0;
+                    $item->CICILAN = $item->can_cicil ? 'Ya' : 'Tidak';
                     $item->FIDBANK = MetodeBayarHelper::resolveDisplayFidBank(
                         $item->FIDBANK !== null ? (string) $item->FIDBANK : null,
                         $item->NOREFF !== null ? (string) $item->NOREFF : null
                     );
                     unset($item->AA);
                     return $item;
-                })->toArray();
+                });
+
+            if (in_array($cicilanFilter, ['ya', '1', 'yes'], true)) {
+                $records = $records->filter(fn ($item) => (int) ($item->can_cicil ?? 0) === 1)->values();
+            } elseif (in_array($cicilanFilter, ['tidak', '0', 'no'], true)) {
+                $records = $records->filter(fn ($item) => (int) ($item->can_cicil ?? 0) !== 1)->values();
+            }
+
+            $totalRecords = $records->count();
+            $records = $records->toArray();
         }
 
         $response = array(

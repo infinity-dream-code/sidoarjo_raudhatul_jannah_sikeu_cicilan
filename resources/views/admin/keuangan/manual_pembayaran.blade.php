@@ -52,7 +52,7 @@
                             </select>
                         </div>
                     </div>
-                    <div class="col-12">
+                    <div class="col-lg-6">
                         <div class="mb-5">
                             <label class="form-label" for="filter_periode">
                                 Periode
@@ -69,6 +69,21 @@
                                 @else
                                     <option>data kosong</option>
                                 @endisset
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="mb-5">
+                            <label class="form-label" for="filter_cicilan">
+                                Cicilan
+                            </label>
+                            <select class="form-select" id="filter_cicilan"
+                                    name="filter[cicilan]"
+                                    data-control="select2"
+                                    data-placeholder="Pilih Cicilan">
+                                <option value="all">Semua</option>
+                                <option value="ya">Ya</option>
+                                <option value="tidak">Tidak</option>
                             </select>
                         </div>
                     </div>
@@ -600,7 +615,7 @@
                     const data = await generateKuitansi(result);
                     if (!data || !data.data) throw createError('Gagal membuat kuitansi', 422);
 
-                    await generatePdf('KUITANSI', data.data, data.unit || false);
+                    await generatePdf('KUITANSI', data.data, data.unit || false, 'kuitansi teller - ' + resolveSiswaNis(result.siswa));
                 } catch (error) {
                     if (error.status === 422) {
                         errorAlert(error.message);
@@ -634,7 +649,7 @@
                 data['tagihans'] = selectedRows;
 
                 const generatedBody = await generatePDFTagihan(data);
-                const pdf = await generatePdf('Tagihan Siswa', generatedBody, selectedSiswa.CODE02 || false);
+                const pdf = await generatePdf('Tagihan Siswa', generatedBody, selectedSiswa.CODE02 || false, 'pratinjau teller - ' + resolveSiswaNis(selectedSiswa));
 
                 if (pdf) { successAlert('Sukses, Rekap telah dicetak'); } else { Swal.close(); }
             }
@@ -798,7 +813,16 @@
                 return descriptions[String(data)] || data;
             }
 
-            async function generatePdf(title, bodyContent, unit_logo) {
+            function resolveSiswaNis(siswa) {
+                const nis = String(siswa?.NOCUST || siswa?.nocust || '').trim();
+                if (nis && nis !== '-') {
+                    return nis;
+                }
+                const daftar = String(siswa?.NUM2ND || siswa?.num2nd || '').trim();
+                return daftar && daftar !== '-' ? daftar : '-';
+            }
+
+            async function generatePdf(title, bodyContent, unit_logo, fileTitle) {
                 unit_logo = unit_logo || false;
                 try {
                     let logo = 'data:image/jpeg;base64,' + headerLogo;
@@ -859,7 +883,12 @@
                         { text: title, style: 'title', margin: [0, 5, 0, 5] }
                     ].concat(bodyContent).concat([footer]);
 
+                    const docTitle = String(fileTitle || title || '');
                     const docDefinition = {
+                        info: {
+                            title: docTitle,
+                            subject: docTitle
+                        },
                         pageSize: 'A4',
                         pageOrientation: orientation,
                         pageMargins: pageMargins,

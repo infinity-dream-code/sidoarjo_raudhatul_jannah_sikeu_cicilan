@@ -1,6 +1,6 @@
 @extends('layouts.export.kop_file')
 @php use Carbon\Carbon; @endphp
-@section('title', 'Bukti Pembayaran  ' . ($siswa->NOCUST ?? '') . ' - ' . ($siswa->NMCUST ?? ''))
+@section('title', $pdfTitle ?? ('Bukti Pembayaran  ' . ($siswa->NOCUST ?? '') . ' - ' . ($siswa->NMCUST ?? '')))
 @section('content')
     <table width="100%">
         <tr>
@@ -11,6 +11,12 @@
     </table>
     @php
         $nis = !($siswa->NOCUST === '' || is_null($siswa->NOCUST) || !is_numeric($siswa->NOCUST));
+        if (!isset($nova) || $nova === '' || $nova === null) {
+            $nisForVa = $nis ? $siswa->NOCUST : ($siswa->NUM2ND ?? '');
+            $nova = ($nisForVa && $nisForVa !== '-')
+                ? \App\Models\scctcust::showVA($nisForVa)
+                : '';
+        }
     @endphp
     <table width="100%" class="main-table">
         <tr>

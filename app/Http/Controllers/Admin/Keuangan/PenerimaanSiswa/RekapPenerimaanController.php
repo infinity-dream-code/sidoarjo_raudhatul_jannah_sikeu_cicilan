@@ -39,7 +39,7 @@ class RekapPenerimaanController extends Controller
         'bank' => 'sccttran.FIDBANK',
         'kelas' => 'scctcust.DESC02',
         'sekolah' => 'scctcust.CODE02',
-        'siswa' => 'scctcust.nmcust',
+        'siswa' => 'scctcust.CUSTID',
         'custid' => 'scctcust.CUSTID',
     ];
     private string $cacheKey = 'rekap_penerimaan';
@@ -268,8 +268,17 @@ class RekapPenerimaanController extends Controller
             $tagihans = $tagihans['original']['data'];
             if (!$tagihans) return response()->json(['message' => 'Tagihan Tidak Ditemukan'], 422);
 //            dd($tagihans, $siswa);
-            $pdf = Pdf::loadView('cetak.kartu-siswa', ['tagihans' => $tagihans, 'siswa' => $siswa]);
-            return $pdf->download('kartu-siswa.pdf');
+            $nisForVa = $siswa->rawNis();
+            $nova = $nisForVa !== '' ? scctcust::showVA($nisForVa) : '';
+
+            $pdf = Pdf::loadView('cetak.kartu-siswa', [
+                'tagihans' => $tagihans,
+                'siswa' => $siswa,
+                'nova' => $nova,
+                'pdfTitle' => 'data pembayaran - kartu siswa',
+            ]);
+
+            return $pdf->stream('data pembayaran - kartu siswa.pdf');
         } catch (\Throwable $e) {
             return response()->json(['message' => 'Tagihan Tidak Ditemukan', 'error' => $e], 422);
         }
@@ -364,7 +373,7 @@ class RekapPenerimaanController extends Controller
                             'bank' => 'sccttran.FIDBANK',
                             'unit' => 'scctcust.CODE02',
                             'kelas' => 'scctcust.DESC02',
-                            'siswa' => 'scctcust.nocust',
+                            'siswa' => 'scctcust.CUSTID',
                             'custid' => 'sccttran.CUSTID',
                             default => null
                         };
@@ -407,8 +416,7 @@ class RekapPenerimaanController extends Controller
                                 ($colName) && $filters[] = [$colName, 'in', $array];
                             }
                         } elseif ($key == 'siswa') {
-                            $val = '%' . $val . '%';
-                            ($colName) && $filters[] = [$colName, 'like', $val];
+                            ($colName) && $filters[] = [$colName, '=', $val];
                         } elseif ($key == 'nama_tagihan') {
                             if (is_array($val)) {
                                 $array = array_values(array_filter($val, fn($item) => !is_null($item) && $item !== '' && strtolower((string) $item) !== 'all'));
@@ -627,7 +635,7 @@ class RekapPenerimaanController extends Controller
                         'bank' => 'sccttran.FIDBANK',
                         'unit' => 'scctcust.CODE02',
                         'kelas' => 'scctcust.DESC02',
-                        'siswa' => 'scctcust.nocust',
+                        'siswa' => 'scctcust.CUSTID',
                         'custid' => 'sccttran.CUSTID',
                         default => null
                     };
@@ -691,8 +699,7 @@ class RekapPenerimaanController extends Controller
                             ($colName) && $filters[] = [$colName, 'like', $val];
                         }
                     } else if ($key == 'siswa') {
-                        $val = '%' . $val . '%';
-                        ($colName) && $filters[] = [$colName, 'like', $val];
+                        ($colName) && $filters[] = [$colName, '=', $val];
                     } elseif ($key === 'bank') {
                         if ((string) $val === '6') {
                             $filters[] = ['_android_bill', '=', '1'];

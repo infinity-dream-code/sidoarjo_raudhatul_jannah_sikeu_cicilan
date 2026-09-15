@@ -914,7 +914,7 @@
                     return APP_VA_PREFIX + digits.padStart(16 - APP_VA_PREFIX.length, '0');
                 })();
 
-            async function generatePdf(title, bodyContent, unit_logo = false) {
+            async function generatePdf(title, bodyContent, unit_logo = false, fileTitle = null) {
                 try {
                     let logo = 'data:image/jpeg;base64,' + headerLogo;
 
@@ -1011,10 +1011,11 @@
                     ];
 
                     // PDF definition
+                    const docTitle = String(fileTitle || title || 'Kartu Pembayaran Siswa');
                     const docDefinition = {
                         info: {
-                            title: String(title || 'KARTU PEMBAYARAN SISWA').toUpperCase(),
-                            subject: 'KARTU PEMBAYARAN SISWA'
+                            title: docTitle,
+                            subject: docTitle
                         },
                         pageSize: 'A4',
                         pageOrientation: orientation,
@@ -1212,7 +1213,7 @@
                 if (!Array.isArray(rows) || rows.length === 0) {
                     generatePdf('REKAP DATA PENERIMAAN', [
                         {text: 'Tidak ada data', alignment: 'center', margin: [0, 20, 0, 0]}
-                    ]);
+                    ], false, 'data tagihan lunas - rekap pdf');
                     return;
                 }
 
@@ -1263,7 +1264,7 @@
                         margin: [0, 0, 0, 10],
                         fontSize: 8
                     }
-                ]);
+                ], false, 'data tagihan lunas - rekap pdf');
             }
 
             function generateKuitansi(biayaLayanan = false) {
@@ -1476,7 +1477,7 @@
                 }
 
                 Swal.close();
-                generatePdf('KUITANSI', content, siswa.CODE02);
+                generatePdf('KUITANSI', content, siswa.CODE02, 'data tagihan lunas - cetak kuitansi');
             }
 
             document.getElementById('cetak-kuitansi').addEventListener('click', async function (e) {
@@ -1523,7 +1524,7 @@
                         throw createError("Data Tagihan Kosong", 422);
                     }
                     const data = await generateKartuSiswa(result);
-                    const pdf = await generatePdf('KARTU PEMBAYARAN SISWA', data, unit)
+                    const pdf = await generatePdf('KARTU PEMBAYARAN SISWA', data, unit, 'data tagihan lunas - kartu siswa')
                     // if (!result['tagihans'] || result['tagihans'].length === 0) {
                     //     console.log('kosong');
                     //     const error = new Error("Data Tagihan Kosong");

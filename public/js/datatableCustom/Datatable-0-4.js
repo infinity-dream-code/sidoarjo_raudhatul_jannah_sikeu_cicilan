@@ -231,6 +231,13 @@ function normalizeExportDateTimeText(text) {
     return out;
 }
 
+function wrapPdfExportText(text) {
+    if (typeof text !== 'string' || !text) {
+        return text;
+    }
+    return text.replace(/(\S{10})/g, '$1\u200b');
+}
+
 function formatDateId(value) {
     const parsed = parseDateTimeValue(value);
     if (!parsed) {
@@ -968,6 +975,16 @@ function dtButtons(options, buttons) {
                             const scale = usableWidth / numericSum;
                             widths = widths.map(width => Math.max(14, Number(width) * scale));
                         }
+                    } else {
+                        const numericSum = widths.reduce((sum, width) => (
+                            width === '*' || width === 'auto' ? sum : sum + Number(width || 0)
+                        ), 0);
+                        if (numericSum > usableWidth - 40) {
+                            const scale = (usableWidth - 80) / Math.max(numericSum, 1);
+                            widths = widths.map(width => (
+                                width === '*' || width === 'auto' ? width : Math.max(14, Number(width) * scale)
+                            ));
+                        }
                     }
                     tableNode.table.widths = widths;
                     tableNode.width = usableWidth;
@@ -975,16 +992,21 @@ function dtButtons(options, buttons) {
                     const pad = options.pdfCellPadding ?? 1;
                     for (let rowIndex = 0; rowIndex < tableNode.table.body.length; rowIndex++) {
                         tableNode.table.body[rowIndex].forEach((cell, cellIndex) => {
+                            const alignment = rowIndex === 0 ? 'center' : 'left';
                             if (typeof cell === 'string') {
-                                tableNode.table.body[rowIndex][cellIndex] = normalizeExportDateTimeText(cell);
+                                tableNode.table.body[rowIndex][cellIndex] = {
+                                    text: wrapPdfExportText(normalizeExportDateTimeText(cell)),
+                                    noWrap: false,
+                                    alignment: alignment,
+                                };
                                 return;
                             }
                             if (cell && typeof cell === 'object') {
                                 if (typeof cell.text === 'string') {
-                                    cell.text = normalizeExportDateTimeText(cell.text);
+                                    cell.text = wrapPdfExportText(normalizeExportDateTimeText(cell.text));
                                 }
                                 cell.noWrap = false;
-                                cell.alignment = cell.alignment || (rowIndex === 0 ? 'center' : 'left');
+                                cell.alignment = cell.alignment || alignment;
                             }
                         });
                     }

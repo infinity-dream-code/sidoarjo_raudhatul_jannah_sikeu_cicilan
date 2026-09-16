@@ -58,7 +58,7 @@
 
 @section('script')
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-date-colon"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('js/helper/errorInputHelper.min.js')}}"></script>
     <script src="{{asset('main/libs/select2/select2.min.js')}}"></script>
 

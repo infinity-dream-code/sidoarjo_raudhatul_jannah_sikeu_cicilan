@@ -291,7 +291,7 @@
 @section('script')
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260916-date-colon"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
     <script src="{{asset('js/unlimited-daterange.js')}}?v=20260911-no-limit"></script>
@@ -318,6 +318,7 @@
             pageLength: 10,
             lengthMenu: [10, 25, 50, 75, 100],
             buttons: ['excel'],
+            excelFilename: 'data pembayaran - export excel',
             excelCurrencyTotal: true,
         };
 

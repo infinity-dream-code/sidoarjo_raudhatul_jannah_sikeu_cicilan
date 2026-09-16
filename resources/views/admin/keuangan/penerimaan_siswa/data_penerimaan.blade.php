@@ -399,7 +399,7 @@
 
     {{--    <script src="{{asset('main/libs/select2/select2.full.min.js')}}"></script>--}}
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260912-tanggal-id"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260916-date-colon"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
 
@@ -904,7 +904,7 @@
             const tandaTangan = @json($tanda_tangan);
             const userName = "{{ Auth::user()->name }}";
             const domisili = "{{ config('app.domisili') }}";
-            const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd, D MMMM YYYY') }}";
+            const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd D MMMM YYYY') }}";
             const APP_VA_PREFIX = @json((string) (config('app.nova') ?: '797783'));
             const showVA = (nis) => typeof formatNoVA === 'function'
                 ? formatNoVA(nis, APP_VA_PREFIX)
@@ -924,9 +924,11 @@
 
                     const orientation = 'portrait';
                     const pageMargins = [20, 20, 20, 20];
-                    const tanggalSekarang = new Date().toLocaleDateString('id-ID', {
-                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                    });
+                    const tanggalSekarang = typeof formatDateId === 'function'
+                        ? formatDateId(new Date())
+                        : new Date().toLocaleDateString('id-ID', {
+                            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                        }).replace(/^([^,]+),\s+/, '$1 ');
                     const availableWidth = getContentWidth('A4', orientation, pageMargins);
 
                     const headerTable = {
@@ -1224,15 +1226,18 @@
 
                 rows.forEach((item, index) => {
                     const tanggalBayar = item.PAIDDT
-                        ? new Date(item.PAIDDT).toLocaleString('id-ID', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit'
-                        })
+                        ? (typeof formatDateTimeId === 'function'
+                            ? formatDateTimeId(item.PAIDDT)
+                            : new Date(item.PAIDDT).toLocaleString('id-ID', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false
+                            }).replace(/^([^,]+),\s+/, '$1 ').replace(/(\d{1,2})\.(\d{2})\.(\d{2})/, '$1:$2:$3'))
                         : '-';
 
                     tableBody.push([
@@ -1363,12 +1368,14 @@
                 data.forEach((item, index) => {
                     let tanggalBayar = item.PAIDDT ?? item.TRXDATE;
                     if (tanggalBayar && tanggalBayar !== '' && tanggalBayar !== '0000-00-00 00:00:00') {
-                        tanggalBayar = new Date(tanggalBayar).toLocaleDateString('id-ID', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                        });
+                        tanggalBayar = typeof formatDateId === 'function'
+                            ? formatDateId(tanggalBayar)
+                            : new Date(tanggalBayar).toLocaleDateString('id-ID', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric'
+                            }).replace(/^([^,]+),\s+/, '$1 ');
                     }
 
                     const billAm = Number(item.BILLAM_TOTAL ?? item.BILLAM ?? 0);

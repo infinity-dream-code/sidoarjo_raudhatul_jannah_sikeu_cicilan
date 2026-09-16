@@ -422,9 +422,11 @@
 
                     const orientation = 'portrait';
                     const pageMargins = [20, 20, 20, 20];
-                    const tanggalSekarang = new Date().toLocaleDateString('id-ID', {
-                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                    });
+                    const tanggalSekarang = typeof formatDateId === 'function'
+                        ? formatDateId(new Date())
+                        : new Date().toLocaleDateString('id-ID', {
+                            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                        }).replace(/^([^,]+),\s+/, '$1 ');
                     const availableWidth = getContentWidth('A4', orientation, pageMargins);
 
                     const headerTable = {
@@ -584,12 +586,14 @@
                 data.forEach((item, index) => {
                     let tanggalBayar = item.PAIDDT;
                     if (tanggalBayar && tanggalBayar !== '' && tanggalBayar !== '0000-00-00 00:00:00') {
-                        tanggalBayar = new Date(tanggalBayar).toLocaleDateString('id-ID', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                        });
+                        tanggalBayar = typeof formatDateId === 'function'
+                            ? formatDateId(tanggalBayar)
+                            : new Date(tanggalBayar).toLocaleDateString('id-ID', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric'
+                            }).replace(/^([^,]+),\s+/, '$1 ');
                     }
 
                     totalTagihan += item.BILLAM;
@@ -627,12 +631,14 @@
                         cutLists.forEach((cut_item, index) => {
                             let tanggalPotongan = cut_item.CUT_DATE;
                             if (tanggalPotongan && tanggalPotongan !== '' && tanggalPotongan !== '0000-00-00 00:00:00') {
-                                tanggalPotongan = new Date(tanggalPotongan).toLocaleDateString('id-ID', {
-                                    weekday: 'long',
-                                    day: 'numeric',
-                                    month: 'long',
-                                    year: 'numeric'
-                                });
+                                tanggalPotongan = typeof formatDateId === 'function'
+                                    ? formatDateId(tanggalPotongan)
+                                    : new Date(tanggalPotongan).toLocaleDateString('id-ID', {
+                                        weekday: 'long',
+                                        day: 'numeric',
+                                        month: 'long',
+                                        year: 'numeric'
+                                    }).replace(/^([^,]+),\s+/, '$1 ');
                             }
 
                             totalPotongan += cut_item.BILL_CUT;

@@ -228,7 +228,7 @@
 @section('script')
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-date-colon"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
     <script src="{{asset('js/unlimited-daterange.js')}}?v=20260911-no-limit"></script>
@@ -408,8 +408,11 @@
 
                 [4, 5].forEach(rowNumber => {
                     const cell = ws.getRow(rowNumber).getCell(2);
-
-                    cell.numFmt = "dddd, dd mmmm yyyy";
+                    if (cell.value instanceof Date) {
+                        cell.value = typeof formatDateId === 'function'
+                            ? formatDateId(cell.value)
+                            : cell.value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/^([^,]+),\s*/, '$1 ');
+                    }
                 });
 
                 const boldRows = [1, 2, 3, 4, 5];
@@ -450,7 +453,9 @@
 
                     row.eachCell({ includeEmpty: true }, cell => {
                         if (cell.value instanceof Date) {
-                            cell.numFmt = "dddd, dd mmmm yyyy";
+                            cell.value = typeof formatDateId === 'function'
+                                ? formatDateId(cell.value)
+                                : cell.value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/^([^,]+),\s*/, '$1 ');
                         }
 
                         if (typeof cell.value === "number") {

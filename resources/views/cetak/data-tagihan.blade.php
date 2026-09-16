@@ -345,7 +345,7 @@
 <table style="width: 100%">
     <tr>
         <td></td>
-        <td align="right">{{ $kota }}, {{ Carbon::now()->locale('id')->isoFormat('dddd, D MMMM YYYY') }}</td>
+        <td align="right">{{ $kota }}, {{ Carbon::now()->locale('id')->isoFormat('dddd D MMMM YYYY') }}</td>
     </tr>
     <tr>
         <td></td>

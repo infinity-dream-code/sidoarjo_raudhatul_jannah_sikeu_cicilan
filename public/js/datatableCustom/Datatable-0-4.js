@@ -147,8 +147,8 @@ function dateToExcelSerial(jsDate) {
 
 const EXCEL_DATE_FORMATS = {
     'basicdate':  { code: 'd mmmm yyyy',                   id: '177' },
-    'date':       { code: 'dddd", "d mmmm yyyy',           id: '178' },
-    'dateformat': { code: 'dddd", "d mmmm yyyy',           id: '178' },
+    'date':       { code: 'dddd" "d mmmm yyyy',            id: '178' },
+    'dateformat': { code: 'dddd" "d mmmm yyyy',            id: '178' },
 };
 
 const ID_DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -207,20 +207,59 @@ function resolvePdfPageWidth(doc, options) {
     return orientation === 'landscape' ? dims[1] : dims[0];
 }
 
+function normalizeExportDateTimeText(text) {
+    if (text == null) {
+        return text;
+    }
+    let out = String(text);
+    out = out.replace(/\b(Minggu|Senin|Selasa|Rabu|Kamis|Jumat|Sabtu),\s*/gi, '$1 ');
+    out = out.replace(/\bpukul\s+/gi, '');
+    out = out.replace(/(\d{1,2})\.(\d{2})\.(\d{2})/g, function (_, hour, minute, second) {
+        const h = Number(hour);
+        if (h > 23) {
+            return _;
+        }
+        return padTime(hour) + ':' + minute + ':' + second;
+    });
+    out = out.replace(/(\d{4})\s+(\d{1,2})\.(\d{2})(?!\d)/g, function (_, year, hour, minute) {
+        const h = Number(hour);
+        if (h > 23) {
+            return _;
+        }
+        return year + ' ' + padTime(hour) + ':' + minute;
+    });
+    return out;
+}
+
+function formatDateId(value) {
+    const parsed = parseDateTimeValue(value);
+    if (!parsed) {
+        return '';
+    }
+    if (typeof parsed === 'string') {
+        return normalizeExportDateTimeText(parsed).replace(/\s+\d{1,2}[:.]\d{2}(?:[:.]\d{2})?\s*$/, '');
+    }
+    return `${ID_DAYS[parsed.getDay()]} ${parsed.getDate()} ${ID_MONTHS[parsed.getMonth()]} ${parsed.getFullYear()}`;
+}
+
 function formatDateTimeId(value, withSeconds = true, compact = false) {
     const parsed = parseDateTimeValue(value);
     if (!parsed) {
         return '';
     }
     if (typeof parsed === 'string') {
-        return parsed;
+        return normalizeExportDateTimeText(parsed);
     }
     const time = `${padTime(parsed.getHours())}:${padTime(parsed.getMinutes())}${withSeconds ? ':' + padTime(parsed.getSeconds()) : ''}`;
     if (compact) {
         return `${padTime(parsed.getDate())}-${padTime(parsed.getMonth() + 1)}-${parsed.getFullYear()} ${time}`;
     }
-    return `${ID_DAYS[parsed.getDay()]}, ${parsed.getDate()} ${ID_MONTHS[parsed.getMonth()]} ${parsed.getFullYear()} ${time}`;
+    return `${ID_DAYS[parsed.getDay()]} ${parsed.getDate()} ${ID_MONTHS[parsed.getMonth()]} ${parsed.getFullYear()} ${time}`;
 }
+
+window.formatDateId = formatDateId;
+window.formatDateTimeId = formatDateTimeId;
+window.normalizeExportDateTimeText = normalizeExportDateTimeText;
 
 function addExcelDateStyle(xlsx, formatCode, numFmtId) {
     const stylesXml = xlsx.xl['styles.xml'];
@@ -261,7 +300,7 @@ function applyExcelDateStyles(xlsx, sheet, dataColumns) {
     dataColumns.forEach(col => {
         if (col.exportable !== true) return;
         const ct = col.columnType?.toLowerCase();
-        if (ct === 'timestamp' || ct === 'datetime') {
+        if (ct === 'timestamp' || ct === 'datetime' || ct === 'date' || ct === 'dateformat') {
             excelIdx++;
             return;
         }
@@ -291,10 +330,10 @@ function applyExcelTimestampColumnWidths(sheet, dataColumns) {
     dataColumns.forEach(col => {
         if (col.exportable !== true) return;
         const ct = (col.columnType || '').toLowerCase();
-        if (ct === 'timestamp' || ct === 'datetime') {
+        if (ct === 'timestamp' || ct === 'datetime' || ct === 'date' || ct === 'dateformat') {
             const colNode = $('col', sheet).eq(excelIdx);
             if (colNode.length) {
-                colNode.attr('width', '48');
+                colNode.attr('width', ct === 'date' || ct === 'dateformat' ? '36' : '48');
                 colNode.attr('customWidth', '1');
             }
         }
@@ -935,8 +974,15 @@ function dtButtons(options, buttons) {
 
                     const pad = options.pdfCellPadding ?? 1;
                     for (let rowIndex = 0; rowIndex < tableNode.table.body.length; rowIndex++) {
-                        tableNode.table.body[rowIndex].forEach(cell => {
+                        tableNode.table.body[rowIndex].forEach((cell, cellIndex) => {
+                            if (typeof cell === 'string') {
+                                tableNode.table.body[rowIndex][cellIndex] = normalizeExportDateTimeText(cell);
+                                return;
+                            }
                             if (cell && typeof cell === 'object') {
+                                if (typeof cell.text === 'string') {
+                                    cell.text = normalizeExportDateTimeText(cell.text);
+                                }
                                 cell.noWrap = false;
                                 cell.alignment = cell.alignment || (rowIndex === 0 ? 'center' : 'left');
                             }
@@ -1030,19 +1076,14 @@ function dtButtons(options, buttons) {
                                 };
                                 return basicDate.toLocaleDateString('id-ID', basicDateOptions);
                             case 'date':
-                            case 'dateformat':
+                            case 'dateformat': {
                                 if (!data) return '';
+                                const formattedDate = formatDateId(data);
                                 if (config.extend === 'excel') {
-                                    return dateToExcelSerial(new Date(data));
+                                    return '\u0000' + formattedDate;
                                 }
-                                let date = new Date(data);
-                                let dateOptions = {
-                                    weekday: 'long',
-                                    day: 'numeric',
-                                    month: 'long',
-                                    year: 'numeric'
-                                };
-                                return date.toLocaleDateString('id-ID', dateOptions);
+                                return formattedDate;
+                            }
                             case 'timestamp':
                             case 'datetime': {
                                 const formatted = formatDateTimeId(data, true, config.extend === 'pdf');
@@ -1540,14 +1581,7 @@ async function getDT(options) {
                             case 'dateformat':
                                 renderFunc = function (data, type, row) {
                                     if (type === 'display' || type === 'filter') {
-                                        let date = new Date(data);
-                                        let options = {
-                                            weekday: 'long',
-                                            day: 'numeric',
-                                            month: 'long',
-                                            year: 'numeric'
-                                        };
-                                        return date.toLocaleDateString('id-ID', options);
+                                        return formatDateId(data);
                                     }
                                     return data;
                                 };

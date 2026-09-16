@@ -223,7 +223,7 @@
 @section('script')
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-date-colon"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.12/pdfmake.min.js"
@@ -268,7 +268,7 @@
         const headerLogo = "{{ base64_encode(file_get_contents(public_path(config('app.logo')))) }}";
         const userName = "KASIR";
         const domisili = "{{ config('app.domisili') }}";
-        const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd, D MMMM YYYY') }}";
+        const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd D MMMM YYYY') }}";
 
         const dariTanggal = $('#filter_dari_tanggal');
 
@@ -446,9 +446,11 @@
 
             function generatePdfRekapTagihanPdfMake(data) {
                 const logo = headerLogo ? {image: 'data:image/jpeg;base64,' + headerLogo, width: 60} : '';
-                const tanggalSekarang = new Date().toLocaleDateString('id-ID', {
-                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                });
+                const tanggalSekarang = typeof formatDateId === 'function'
+                    ? formatDateId(new Date())
+                    : new Date().toLocaleDateString('id-ID', {
+                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                    }).replace(/^([^,]+),\s+/, '$1 ');
 
                 const orientation = 'portrait';
                 const pageMargins = [20, 20, 20, 20];

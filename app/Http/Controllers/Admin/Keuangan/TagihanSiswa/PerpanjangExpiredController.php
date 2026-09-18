@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\mst_kelas;
 use App\Models\scctbill;
 use App\Models\scctcust;
+use App\Support\PerpanjangTagihanExpiredProcedure;
 use App\Support\SchoolScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -60,6 +62,7 @@ class PerpanjangExpiredController extends Controller
             'autoExpDateLabel' => $autoExp->translatedFormat('d F Y'),
             'dataUrl' => route('admin.keuangan.tagihan-siswa.perpanjang-expired.get-data'),
             'storeUrl' => route('admin.keuangan.tagihan-siswa.perpanjang-expired.store'),
+            'autoAllUrl' => route('admin.keuangan.tagihan-siswa.perpanjang-expired.auto-all'),
             'backUrl' => route('admin.keuangan.tagihan-siswa.data-tagihan.index'),
         ]);
     }
@@ -237,6 +240,44 @@ class PerpanjangExpiredController extends Controller
 
             return response()->json([
                 'message' => 'Gagal memperpanjang expired date: ' . $e->getMessage(),
+                'error' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function autoAll()
+    {
+        try {
+            $result = PerpanjangTagihanExpiredProcedure::call($this->sekolah);
+            $updated = (int) ($result['updated'] ?? 0);
+            $expRaw = $result['exp_date'] ?? null;
+            $newExp = $expRaw
+                ? Carbon::parse($expRaw)
+                : DataTagihanController::resolveAutoExtendExpDate();
+
+            Cache::increment(Str::slug($this->cacheKey) . '_cache_version');
+
+            if ($updated <= 0) {
+                return response()->json([
+                    'message' => 'Tidak ada tagihan expired yang perlu diperpanjang.',
+                    'updated' => 0,
+                    'exp_date' => $newExp->format('Y-m-d H:i:s'),
+                ], 200);
+            }
+
+            return response()->json([
+                'message' => "Berhasil memperpanjang otomatis {$updated} tagihan sampai {$newExp->translatedFormat('d F Y')}.",
+                'updated' => $updated,
+                'exp_date' => $newExp->format('Y-m-d H:i:s'),
+            ], 200);
+        } catch (\Throwable $e) {
+            Log::error('perpanjang-expired.auto-all.failed', [
+                'message' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+
+            return response()->json([
+                'message' => 'Gagal perpanjang otomatis: ' . $e->getMessage(),
                 'error' => $e->getMessage(),
             ], 422);
         }

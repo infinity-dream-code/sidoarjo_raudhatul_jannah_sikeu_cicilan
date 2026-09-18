@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -743,12 +744,19 @@ class DataTagihanController extends Controller
         try {
             return $this->buildGetDataResponse($request);
         } catch (\Throwable $e) {
+            Log::error('data-tagihan.get-data.failed', [
+                'user_id' => auth()->id(),
+                'message' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+
             return response()->json([
                 'draw' => intval($request->get('draw')),
                 'recordsTotal' => 0,
                 'recordsFiltered' => 0,
                 'data' => [],
-                'error' => 'Gagal memuat data tagihan',
+                'message' => 'Gagal memuat data tagihan: ' . $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

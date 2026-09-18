@@ -127,6 +127,32 @@
         .dt-tagihan-wrap #main_table td .btn {
             white-space: nowrap;
         }
+
+        .filter-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        .filter-actions__group {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filter-actions .btn {
+            white-space: nowrap;
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.2;
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
     </style>
 @endsection
 @section('content')
@@ -292,32 +318,43 @@
                             </div>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="d-flex justify-content-center flex-column flex-md-row justify-content-md-end gap-4">
-                            <button type="button" class="btn btn-warning" id="btn-lihat-expired">
-                                <span class="ri-alarm-warning-line me-2"></span>
-                                Lihat Tagihan Expired
-                            </button>
-                            <a href="{{ route('admin.keuangan.tagihan-siswa.perpanjang-expired.index') }}" class="btn btn-info" id="btn-perpanjang-bulk">
-                                <span class="ri-calendar-schedule-line me-2"></span>
-                                Perpanjang Expired
-                            </a>
-                            <button type="button" class="btn btn-facebook" id="cetak-kartu-siswa">
-                                <span class="ri-info-card-line me-2"></span>
-                                Cetak Kartu Siswa
-                            </button>
-                            <button type="button" class="btn btn-google-plus btn-print-rekap">
-                                <span class="ri-file-pdf-2-line me-2"></span>
-                                Cetak Rekap
-                            </button>
-                            <button type="reset" class="btn btn-secondary">
-                                <span class="ri-reset-left-line me-2"></span>
-                                Reset
-                            </button>
-                            <button type="submit" class="btn btn-primary">
-                                <span class="ri-search-line me-2"></span>
-                                Cari
-                            </button>
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <div class="filter-actions">
+                                <div class="filter-actions__group">
+                                    <button type="button" class="btn btn-sm btn-warning" id="btn-lihat-expired" title="Filter tagihan expired">
+                                        <span class="ri-alarm-warning-line me-1"></span>
+                                        Lihat Expired
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-info" id="btn-perpanjang-auto-all" title="Perpanjang otomatis semua tagihan expired">
+                                        <span class="ri-calendar-schedule-line me-1"></span>
+                                        Perpanjang Otomatis
+                                    </button>
+                                    <a href="{{ route('admin.keuangan.tagihan-siswa.perpanjang-expired.index') }}"
+                                       class="btn btn-sm btn-outline-info" title="Pilih tagihan expired secara manual">
+                                        <span class="ri-list-check-2 me-1"></span>
+                                        Pilih Manual
+                                    </a>
+                                </div>
+                                <div class="filter-actions__group">
+                                    <button type="button" class="btn btn-sm btn-facebook" id="cetak-kartu-siswa">
+                                        <span class="ri-info-card-line me-1"></span>
+                                        Cetak Kartu
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-google-plus btn-print-rekap">
+                                        <span class="ri-file-pdf-2-line me-1"></span>
+                                        Cetak Rekap
+                                    </button>
+                                    <button type="reset" class="btn btn-sm btn-secondary">
+                                        <span class="ri-reset-left-line me-1"></span>
+                                        Reset
+                                    </button>
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <span class="ri-search-line me-1"></span>
+                                        Cari
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </fieldset>
@@ -628,7 +665,11 @@
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
     <script src="{{asset('js/va-format.js')}}?v=20260619"></script>
+<<<<<<< HEAD
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260913-ajax-error"></script>
+=======
     <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260916-pdf-va"></script>
+>>>>>>> e6c559c039a2946823e6b8cc468bc29492ed842b
     <script>
         window.DATA_TAGIHAN_BOOT = {
             columnUrl: @json($columnsUrl ?? null),
@@ -1117,7 +1158,46 @@
             dataReFilter(dtOptions.tableId);
         });
 
-        // Tombol Perpanjang Expired di form filter sekarang link ke halaman khusus.
+        function currentCsrfToken() {
+            return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        }
+
+        document.getElementById('btn-perpanjang-auto-all')?.addEventListener('click', function () {
+            if (!confirm('Perpanjang otomatis SEMUA tagihan yang ExpDate sudah kadaluarsa?\n\nTanggal baru: tgl 20 (hari ≤20 bulan ini, hari >20 bulan depan).')) {
+                return;
+            }
+
+            loadingAlert('Memperpanjang otomatis semua tagihan expired...');
+            fetch(@json(route('admin.keuangan.tagihan-siswa.perpanjang-expired.auto-all')), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': currentCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({}),
+            })
+                .then(async (response) => {
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw { status: response.status, message: data.message || response.statusText };
+                    }
+                    return data;
+                })
+                .then((data) => {
+                    dataReload(dtOptions.tableId);
+                    successAlert(data.message || 'Perpanjang otomatis selesai.');
+                })
+                .catch((error) => {
+                    if (error.status === 419) {
+                        errorAlert('Sesi/CSRF sudah habis. Silahkan muat ulang halaman lalu coba lagi.');
+                        return;
+                    }
+                    errorAlert(error.message || 'Gagal perpanjang otomatis.');
+                });
+        });
 
         document.getElementById('form-perpanjang-exp')?.addEventListener('submit', function (e) {
             e.preventDefault();

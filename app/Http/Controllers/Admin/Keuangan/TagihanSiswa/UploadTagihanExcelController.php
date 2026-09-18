@@ -183,6 +183,10 @@ class UploadTagihanExcelController extends Controller
                 [ExcelImportSheet::class, 'isTemplateSampleNis']
             );
 
+            if ((int) ($sheet['usable'] ?? 0) === 0) {
+                throw new \Exception('File hanya berisi baris contoh template (NIS 99999999…). Ganti dengan NIS siswa yang sebenarnya, hapus baris contoh, lalu import ulang.');
+            }
+
             $cacheKey = $this->resolvedCacheKey();
             Cache::forget($cacheKey);
             Excel::import(new ImportTagihanExcel($cacheKey, $sheet['index']), $file);

@@ -202,7 +202,7 @@
 @section('script')
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
@@ -402,9 +402,11 @@
                     const row = ws.addRow(Object.values(r));
 
                     row.eachCell({ includeEmpty: true }, cell => {
-                        if (cell.value instanceof Date) {
-                            cell.numFmt = "dddd, dd mmmm yyyy";
-                        }
+                            if (cell.value instanceof Date) {
+                                cell.value = typeof formatDateId === 'function'
+                                    ? formatDateId(cell.value)
+                                    : cell.value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/^([^,]+),\s*/, '$1 ');
+                            }
 
                         if (typeof cell.value === "number") {
                             cell.numFmt = '"Rp "#,##0;\\("Rp "#,##0\\)';
@@ -541,11 +543,11 @@
                         }
 
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br>Jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>Silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>Silahkan tunggu beberapa saat 🙏',
                         };
 

@@ -154,10 +154,6 @@
                     </div>
                     <div class="row">
                         <div class="d-flex justify-content-center justify-content-md-end gap-4">
-                            <button type="button" class="btn btn-whatsapp" id="btn-reset-android-selected">
-                                <span class="ri-android-line me-2"></span>
-                                Reset Login Android
-                            </button>
                             <button type="reset" class="btn btn-secondary">
                                 <span class="ri-reset-left-line me-2"></span>
                                 Reset
@@ -456,7 +452,7 @@
 
 
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.min.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260610-row-border"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/select2/select2.min.js')}}"></script>
     <script src="{{asset('js/helper/errorInputHelper.min.js')}}"></script>
 
@@ -734,11 +730,11 @@
                 }
 
                 const errorMessages = {
-                    401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman atau login kembali!',
+                    401: 'Permintaan gagal diproses. Silakan coba lagi.',
                     403: 'Anda tidak memiliki izin untuk mengakses 😖',
                     404: 'Halaman tidak ditemukan 🧐',
                     405: 'Metode tidak valid 🧐 <br>Silakan coba lagi!',
-                    419: 'Sesi anda sudah habis 🙏 <br>Silahkan login kembali!',
+                    419: 'Permintaan gagal diproses. Silakan coba lagi.',
                     429: 'Terlalu banyak permintaan 🙏 <br>Tunggu beberapa saat!',
                 };
 
@@ -772,9 +768,6 @@
         document.addEventListener("DOMContentLoaded", function () {
             if (dtOptions.dataUrl && dtOptions.columnUrl) {
                 getDT(dtOptions);
-                $(`#${dtOptions.tableId}`).on('draw.dt', function () {
-                    syncResetAndroidCheckboxes();
-                });
                 if (dtOptions.formId) {
                     let filterForm = $(`#${dtOptions.formId}`);
                     filterForm.on('submit', function (e) {
@@ -964,7 +957,7 @@
                 }
             });
 
-            document.getElementById('btn-reset-android-selected').addEventListener('click', async function () {
+            document.getElementById('btn-reset-android-selected')?.addEventListener('click', async function () {
                 const ids = Array.from(selectedResetAndroidIds);
                 if (ids.length === 0) {
                     warningAlert('Pilih siswa dulu untuk reset android.');

@@ -258,7 +258,7 @@
 
     {{--    <script src="{{asset('main/libs/select2/select2.full.min.js')}}"></script>--}}
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
 
@@ -432,11 +432,11 @@
                         }
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -528,11 +528,11 @@
                             }
                         } else {
                             const errorMessages = {
-                                401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                401: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                                 404: 'Halaman yang dituju tidak ditemukan 🧐',
                                 405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                                419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                419: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                             };
                             errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -606,7 +606,7 @@
         const tandaTangan = "{{ Auth::user()->tanda_tangan ? base64_encode(file_get_contents(public_path('storage/photos/tanda_tangan/'.Auth::user()->tanda_tangan))) : '' }}";
         const userName = "{{ Auth::user()->name }}";
         const domisili = "{{ config('app.domisili') }}";
-        const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd, D MMMM YYYY') }}";
+        const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd D MMMM YYYY') }}";
 
         document.getElementById('download-pdf').addEventListener('click', function (e) {
             e.preventDefault();
@@ -661,11 +661,11 @@
                         }
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -748,12 +748,12 @@
 
                     post.tagihans.forEach((item, index) => {
                         const dateObj = new Date(item.PAIDDT);
-                        const formattedDate = dateObj.toLocaleDateString('id-ID', {
-                            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                        });
-                        const formattedTime = dateObj.toLocaleTimeString('id-ID', {
-                            hour: '2-digit', minute: '2-digit'
-                        });
+                        const formattedDate = typeof formatDateId === 'function'
+                            ? formatDateId(dateObj)
+                            : dateObj.toLocaleDateString('id-ID', {
+                                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                            }).replace(/^([^,]+),\s+/, '$1 ');
+                        const formattedTime = `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
 
                         // Check if NIS is same as previous row
                         let nisCell = item.nocust;

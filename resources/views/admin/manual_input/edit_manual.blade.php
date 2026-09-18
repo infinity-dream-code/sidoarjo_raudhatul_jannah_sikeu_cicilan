@@ -67,8 +67,8 @@
                 <div class="col-12">
                     <div class="card-datatable table-responsive text-nowrap px-5">
                         <div class="card-header">
-                            TAGIHAN YANG TAMPIL DI BANK
-                            <small class="text-muted d-block">Tagihan belum pernah dibayar (cicilan = 0)</small>
+                            Tagihan yang dapat diedit
+                            <small class="text-muted d-block">Hanya tagihan yang belum ada pembayaran. Jika sudah dicicil, tagihan pindah ke tabel bawah dan tidak dapat diubah.</small>
                         </div>
                         <div class="col-12">
                             <table class="table table-sm table-bordered table-hover"
@@ -82,7 +82,8 @@
                     </div>
                     <div class="card-datatable table-responsive text-nowrap px-5">
                         <div class="card-header">
-                            TAGIHAN YANG SUDAH DIBAYAR
+                            Tagihan yang sudah dibayar / dicicil
+                            <small class="text-muted d-block">Tidak dapat diedit. Kolom Cicil Ke diambil dari jumlah cicilan (INSTALLMENT).</small>
                         </div>
                         <table class="table table-sm table-bordered table-hover"
                                id="table-tagihan-dibayar">
@@ -117,7 +118,7 @@
 
 @section('script')
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/select2/select2.min.js')}}"></script>
     <script src="{{asset('js/helper/formattedNumber.min.js')}}"></script>
 
@@ -181,7 +182,7 @@
                 if (xhr.status === 422) {
                     errorAlert('Gagal mendapat data siswa');
                 } else if (xhr.status === 419) {
-                    errorAlert('Sesi anda telah habis, Silahkan Login Kembali');
+                    errorAlert('Permintaan gagal diproses. Silakan coba lagi.');
                 } else if (xhr.status === 500) {
                     errorAlert('Tidak dapat terhubung ke server, Silahkan periksa koneksi internet anda');
                 } else if (xhr.status === 403) {
@@ -265,13 +266,13 @@
 
             const selectedTagihanDibayar = tableTagihanDibayar.rows({selected: true}).data();
             if (selectedTagihanDibayar[0]) {
-                warningAlert('Tagihan yang sudah dibayarkan tidak bisa diedit!')
+                warningAlert('Tagihan yang sudah dibayar / dicicil tidak bisa diedit!')
                 return;
             }
 
             const selectedTagihan = tableTagihan.rows({selected: true});
             if (!selectedTagihan.data()[0]) {
-                warningAlert('Silahkan pilih tagihan yang tampil di bank!')
+                warningAlert('Silahkan pilih tagihan yang bisa diedit!')
                 return;
             }
 
@@ -345,11 +346,11 @@
                         }
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -358,15 +359,42 @@
                 });
         }
 
+        function cicilKeValue(row) {
+            return Number(row?.CICIL_KE ?? row?.INSTALLMENT ?? 0) || 0;
+        }
+
+        function formatCicilKe(row) {
+            const value = cicilKeValue(row);
+            return value > 0 ? String(value) : '-';
+        }
+
+        function formatKeteranganTagihan(row) {
+            const paidSt = Number(row?.PAIDST ?? 0);
+            const cicilKe = cicilKeValue(row);
+            const billPaid = Number(row?.BILLPAID ?? 0);
+
+            if (paidSt === 1) {
+                return cicilKe > 0
+                    ? `Sudah lunas (cicil ke ${cicilKe}), tidak dapat diedit`
+                    : 'Sudah lunas, tidak dapat diedit';
+            }
+            if (billPaid > 0 || cicilKe > 0) {
+                return cicilKe > 0
+                    ? `Sudah dicicil ke ${cicilKe}, tidak dapat diedit`
+                    : 'Sudah dicicil, tidak dapat diedit';
+            }
+            return '-';
+        }
+
         function refreshTableTagihan(newData = []) {
             const splitByPaidStatus = newData.reduce((acc, item) => {
                 const paidSt = Number(item.PAIDST ?? 0);
                 const billPaid = Number(item.BILLPAID ?? 0);
-                const installmentPaid = Number(item.isINSTALLABLE ?? 0);
+                const cicilKe = cicilKeValue(item);
 
-                if (paidSt === 1) {
+                if (paidSt === 1 || billPaid > 0 || cicilKe > 0) {
                     acc.paid.push(item);
-                } else if (billPaid === 0 && installmentPaid === 0) {
+                } else {
                     acc.unpaid.push(item);
                 }
                 return acc;
@@ -441,11 +469,11 @@
                 }
 
                 const errorMessages = {
-                    401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman atau login kembali!',
+                    401: 'Permintaan gagal diproses. Silakan coba lagi.',
                     403: 'Anda tidak memiliki izin untuk mengakses 😖',
                     404: 'Halaman tidak ditemukan 🧐',
                     405: 'Metode tidak valid 🧐 <br>Silakan coba lagi!',
-                    419: 'Sesi anda sudah habis 🙏 <br>Silahkan login kembali!',
+                    419: 'Permintaan gagal diproses. Silakan coba lagi.',
                     429: 'Terlalu banyak permintaan 🙏 <br>Tunggu beberapa saat!',
                 };
 
@@ -494,11 +522,14 @@
                     {data: 'nis', title: 'NIS', render: function (data, type, row) {
                         return data || row.NOCUST || row.nocust || '-';
                     }},
-                    {data: 'nama', title: 'NAMA', render: function (data, type, row) {
+                    {data: 'nama', title: 'Nama', render: function (data, type, row) {
                         return data || row.NMCUST || row.nmcust || '-';
                     }},
+                    {data: 'unit', title: 'Unit', render: function (data, type, row) {
+                        return data || row.CODE02 || '-';
+                    }},
                     {data: 'kelas', title: 'Kelas'},
-                    {data: 'jenjang', title: 'Jenjang'},
+                    {data: 'kelompok', title: 'Kelompok'},
                     {data: 'angkatan', title: 'Angkatan'},
                 ],
                 columnDefs: [
@@ -534,10 +565,27 @@
             tableTagihan = $('#table-tagihan').DataTable({
                 columns: [
                     {data: 'AA'},
-                    {data: 'BILLNM', title: 'NAMA TAGIHAN'},
+                    {data: 'BILLNM', title: 'Nama Tagihan'},
+                    {data: 'BILLAC', title: 'Periode'},
+                    {
+                        data: 'CICIL_KE',
+                        title: 'Cicil Ke',
+                        className: 'text-center',
+                        render: function (data, type, row) {
+                            return formatCicilKe(row);
+                        }
+                    },
+                    {
+                        data: 'isINSTALLABLE',
+                        title: 'Cicilan',
+                        className: 'text-center',
+                        render: function (data) {
+                            return Number(data ?? 0) > 0 ? 'Ya' : 'Tidak';
+                        }
+                    },
                     {
                         data: 'BILLAM',
-                        title: 'JUMLAH',
+                        title: 'Nominal',
                         className: 'text-end',
                         render: function (data, type) {
                             const value = Number(data ?? 0);
@@ -547,7 +595,6 @@
                             return value;
                         }
                     },
-                    {data: 'BILLAC', title: 'PERIODE'},
                     {data: 'FUrutan', title: 'Urutan'},
                 ],
                 columnDefs: [
@@ -567,7 +614,7 @@
                 ],
                 language: {
                     ...languageData,
-                    emptyTable: "Tidak ada tagihan yang belum pernah dibayar"
+                    emptyTable: "Tidak ada tagihan yang dapat diedit"
                 },
 
                 paging: true,
@@ -576,16 +623,32 @@
                 searching: false,
                 lengthChange: false,
                 pageLength: 10,
-                order: [[4, 'asc']],
+                order: [[6, 'asc']],
                 scrollX: true,
             });
 
             tableTagihanDibayar = $('#table-tagihan-dibayar').DataTable({
                 columns: [
-                    {data: 'BILLNM', title: 'NAMA TAGIHAN'},
+                    {data: 'BILLNM', title: 'Nama Tagihan'},
+                    {data: 'BILLAC', title: 'Periode'},
+                    {
+                        data: 'CICIL_KE',
+                        title: 'Cicil Ke',
+                        className: 'text-center',
+                        render: function (data, type, row) {
+                            return formatCicilKe(row);
+                        }
+                    },
+                    {
+                        data: 'KETERANGAN',
+                        title: 'Keterangan',
+                        render: function (data, type, row) {
+                            return formatKeteranganTagihan(row);
+                        }
+                    },
                     {
                         data: 'BILLAM',
-                        title: 'JUMLAH',
+                        title: 'Nominal',
                         className: 'text-end',
                         render: function (data) {
                             const value = Number(data);
@@ -599,12 +662,49 @@
                             return value < 0 ? `Rp. -${formatted.replace('Rp. ', '')}` : formatted;
                         }
                     },
-                    {data: 'BILLAC', title: 'PERIODE'},
+                    {
+                        data: 'BILLPAID',
+                        title: 'Terbayar',
+                        className: 'text-end',
+                        render: function (data) {
+                            const value = Number(data ?? 0);
+                            if (!Number.isFinite(value)) {
+                                return 'Rp. 0';
+                            }
+                            return $.fn.dataTable.render.number('.', ',', 0, 'Rp. ').display(Math.abs(value));
+                        }
+                    },
+                    {
+                        data: 'PAYMENTLEFT',
+                        title: 'Sisa',
+                        className: 'text-end',
+                        render: function (data) {
+                            const value = Number(data ?? 0);
+                            if (!Number.isFinite(value)) {
+                                return 'Rp. 0';
+                            }
+                            return $.fn.dataTable.render.number('.', ',', 0, 'Rp. ').display(Math.abs(value));
+                        }
+                    },
+                    {
+                        data: 'PAIDST',
+                        title: 'Status',
+                        className: 'text-center',
+                        render: function (data, type, row) {
+                            if (Number(data ?? 0) === 1) {
+                                return 'Lunas';
+                            }
+                            if (Number(row.BILLPAID ?? 0) > 0 || cicilKeValue(row) > 0) {
+                                return 'Sudah dicicil';
+                            }
+                            return 'Belum lunas';
+                        }
+                    },
                     {data: 'FUrutan', title: 'Urutan'},
                 ],
                 language: {
                     ...languageData,
-                    emptyTable: "Tidak ada tagihan yang sudah dibayar"
+                    emptyTable: "Tidak ada tagihan yang sudah dibayar / dicicil"
                 },
 
                 paging: true,
@@ -613,7 +713,7 @@
                 searching: false,
                 lengthChange: false,
                 pageLength: 10,
-                order: [[3, 'asc']],
+                order: [[8, 'asc']],
                 scrollX: true,
             });
 

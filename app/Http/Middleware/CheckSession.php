@@ -15,10 +15,18 @@ class CheckSession
      */
     public function handle($request, Closure $next)
     {
-        if (!session()->has('user')) {
-            return redirect()->route('login');
+        if (!\Illuminate\Support\Facades\Auth::check()) {
+            \App\Support\PersistentLogin::restore();
         }
 
-        return $next($request);
+        if (\Illuminate\Support\Facades\Auth::check() || session()->has('user')) {
+            return $next($request);
+        }
+
+        if (\App\Support\PersistentLogin::hasCookie()) {
+            return response()->view('errors.500', [], 500);
+        }
+
+        return redirect()->route('login');
     }
 }

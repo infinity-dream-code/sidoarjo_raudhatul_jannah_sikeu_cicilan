@@ -84,7 +84,7 @@
 
 @section('script')
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/select2/select2.min.js')}}"></script>
 
     <form id="formImport" enctype="multipart/form-data" class="mainForm"
@@ -103,11 +103,12 @@
                             <li class="list-group-item list-group-timeline-danger">File harus berformat <span class="fw-bold">XLS/XLSX</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Ukuran file tidak boleh lebih dari <span class="fw-bold">1024KB/1MB</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">Nama, Unit, Kelas, Kelompok, Angkatan</span> plus <span class="fw-bold">NIS</span> atau <span class="fw-bold">NODAFTAR</span>.</li>
+                            <li class="list-group-item list-group-timeline-primary">Tidak perlu pilih sekolah saat simpan. Unit baru otomatis ditambahkan ke master sekolah dan master kelas, lalu data siswa ikut tersimpan.</li>
                             <li class="list-group-item list-group-timeline-danger">Kolom opsional: <span class="fw-bold">Gender, Alamat, Ortu, NO_WA</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Yang diimpor adalah <span class="fw-bold">sheet yang sedang aktif</span> saat file Excel disimpan (bukan selalu sheet paling kiri).</li>
                             <li class="list-group-item list-group-timeline-danger">Contoh file yang dapat diproses untuk import:
                                 <a class="btn btn-sm btn-outline-primary fw-bolder"
-                                   href="{{asset('TEMPLATE MENU UPLOAD DATA SISWA.xlsx')}}?v=20260903"
+                                   href="{{asset('TEMPLATE MENU UPLOAD DATA SISWA.xlsx')}}?v=20260912"
                                    download>
                                     <i class="ri ri-file-excel-line me-2"></i>Contoh File
                                 </a>
@@ -162,21 +163,9 @@
                             </div>
                         </div>
                         <fieldset class="form-fieldset">
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <label class="form-label" for="sekolah">Sekolah <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="sekolah" name="sekolah"
-                                            data-control="select2"
-                                            data-placeholder="Pilih Sekolah">
-                                        <option value="" disabled selected>Pilih Sekolah</option>
-                                        @isset($sekolah)
-                                            @foreach($sekolah as $item)
-                                                <option value="{{ $item->CODE01 }}">{{ $item->DESC01 }}</option>
-                                            @endforeach
-                                        @endisset
-                                    </select>
-                                </div>
-                            </div>
+                            <p class="text-muted small mb-3">
+                                Unit/kelas diambil dari Excel. Jika belum terdaftar, sistem menambahkannya ke master sekolah dan master kelas, lalu menyimpan data siswa.
+                            </p>
                             <div class="row mb-3">
                                 <div class="col">
                                     <label class="form-label" for="metode">Metode Penyimpanan <span class="text-danger">*</span></label>
@@ -224,9 +213,9 @@
 
         let dtOptions = {
             tableId: 'main_table',
-            formId: 'filterForm',
-            columnUrl: '{{($columnsUrl??null)}}?v=20260903',
-            dataUrl: '{{($datasUrl??null)}}?v=20260604',
+            formId: null,
+            columnUrl: '{{($columnsUrl??null)}}?v=20260914',
+            dataUrl: '{{($datasUrl??null)}}?v=20260914',
             dataColumns: [],
             thead: true,
             tfoot: true,
@@ -379,13 +368,6 @@
                 });
             }
 
-            document.getElementById('metode')?.addEventListener('change', function () {
-                const sekolahField = document.getElementById('sekolah');
-                if (!sekolahField) return;
-                const needsSekolah = ['1', '2'].includes(this.value);
-                sekolahField.required = needsSekolah;
-            });
-
             document.querySelectorAll(".mainForm").forEach(form => {
                 form.addEventListener("submit", function (e) {
                     e.preventDefault();
@@ -450,11 +432,11 @@
                                 }
                             } else {
                                 const errorMessages = {
-                                    401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                    401: 'Permintaan gagal diproses. Silakan coba lagi.',
                                     403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                                     404: 'Halaman yang dituju tidak ditemukan 🧐',
                                     405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                                    419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                    419: 'Permintaan gagal diproses. Silakan coba lagi.',
                                     429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                                 };
                                 errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -518,11 +500,11 @@
                             }
                         } else {
                             const errorMessages = {
-                                401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                401: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                                 404: 'Halaman yang dituju tidak ditemukan 🧐',
                                 405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                                419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                419: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                             };
                             errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");

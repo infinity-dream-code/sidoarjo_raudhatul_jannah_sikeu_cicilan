@@ -147,11 +147,126 @@ function dateToExcelSerial(jsDate) {
 
 const EXCEL_DATE_FORMATS = {
     'basicdate':  { code: 'd mmmm yyyy',                   id: '177' },
-    'date':       { code: 'dddd", "d mmmm yyyy',           id: '178' },
-    'dateformat': { code: 'dddd", "d mmmm yyyy',           id: '178' },
-    'timestamp':  { code: 'dddd", "d mmmm yyyy hh:mm',     id: '179' },
-    'datetime':   { code: 'dddd", "d mmmm yyyy hh:mm',     id: '179' },
+    'date':       { code: 'dddd" "d mmmm yyyy',            id: '178' },
+    'dateformat': { code: 'dddd" "d mmmm yyyy',            id: '178' },
 };
+
+const ID_DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const ID_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+function padTime(value) {
+    return String(value).padStart(2, '0');
+}
+
+function parseDateTimeValue(value) {
+    if (!value || value === '0000-00-00 00:00:00' || value === '0000-00-00') {
+        return null;
+    }
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value;
+    }
+    const raw = String(value).trim();
+    if (/Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember/i.test(raw)) {
+        return raw;
+    }
+    const mysql = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (mysql) {
+        return new Date(
+            Number(mysql[1]),
+            Number(mysql[2]) - 1,
+            Number(mysql[3]),
+            Number(mysql[4]),
+            Number(mysql[5]),
+            Number(mysql[6] || 0)
+        );
+    }
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function resolvePdfPageWidth(doc, options) {
+    const pageSizes = {
+        A4: [595.28, 841.89],
+        A3: [841.89, 1190.55],
+        A2: [1190.55, 1683.78],
+        LETTER: [612, 792],
+        LEGAL: [612, 1008],
+        TABLOID: [792, 1224],
+    };
+    const orientation = String(doc.pageOrientation || options.pdfOrientation || 'portrait').toLowerCase();
+    const size = doc.pageSize;
+    if (size && typeof size === 'object') {
+        const width = Number(size.width);
+        const height = Number(size.height);
+        if (width > 0 && height > 0) {
+            return orientation === 'landscape' ? Math.max(width, height) : Math.min(width, height);
+        }
+    }
+    const pageKey = String(options.pdfPageSize || size || 'A4').toUpperCase();
+    const dims = pageSizes[pageKey] || pageSizes.A4;
+    return orientation === 'landscape' ? dims[1] : dims[0];
+}
+
+function normalizeExportDateTimeText(text) {
+    if (text == null) {
+        return text;
+    }
+    let out = String(text);
+    out = out.replace(/\b(Minggu|Senin|Selasa|Rabu|Kamis|Jumat|Sabtu),\s*/gi, '$1 ');
+    out = out.replace(/\bpukul\s+/gi, '');
+    out = out.replace(/(\d{1,2})\.(\d{2})\.(\d{2})/g, function (_, hour, minute, second) {
+        const h = Number(hour);
+        if (h > 23) {
+            return _;
+        }
+        return padTime(hour) + ':' + minute + ':' + second;
+    });
+    out = out.replace(/(\d{4})\s+(\d{1,2})\.(\d{2})(?!\d)/g, function (_, year, hour, minute) {
+        const h = Number(hour);
+        if (h > 23) {
+            return _;
+        }
+        return year + ' ' + padTime(hour) + ':' + minute;
+    });
+    return out;
+}
+
+function wrapPdfExportText(text) {
+    if (typeof text !== 'string' || !text) {
+        return text;
+    }
+    return text.replace(/(\S{10})/g, '$1\u200b');
+}
+
+function formatDateId(value) {
+    const parsed = parseDateTimeValue(value);
+    if (!parsed) {
+        return '';
+    }
+    if (typeof parsed === 'string') {
+        return normalizeExportDateTimeText(parsed).replace(/\s+\d{1,2}[:.]\d{2}(?:[:.]\d{2})?\s*$/, '');
+    }
+    return `${ID_DAYS[parsed.getDay()]} ${parsed.getDate()} ${ID_MONTHS[parsed.getMonth()]} ${parsed.getFullYear()}`;
+}
+
+function formatDateTimeId(value, withSeconds = true, compact = false) {
+    const parsed = parseDateTimeValue(value);
+    if (!parsed) {
+        return '';
+    }
+    if (typeof parsed === 'string') {
+        return normalizeExportDateTimeText(parsed);
+    }
+    const time = `${padTime(parsed.getHours())}:${padTime(parsed.getMinutes())}${withSeconds ? ':' + padTime(parsed.getSeconds()) : ''}`;
+    if (compact) {
+        return `${padTime(parsed.getDate())}-${padTime(parsed.getMonth() + 1)}-${parsed.getFullYear()} ${time}`;
+    }
+    return `${ID_DAYS[parsed.getDay()]} ${parsed.getDate()} ${ID_MONTHS[parsed.getMonth()]} ${parsed.getFullYear()} ${time}`;
+}
+
+window.formatDateId = formatDateId;
+window.formatDateTimeId = formatDateTimeId;
+window.normalizeExportDateTimeText = normalizeExportDateTimeText;
 
 function addExcelDateStyle(xlsx, formatCode, numFmtId) {
     const stylesXml = xlsx.xl['styles.xml'];
@@ -192,6 +307,10 @@ function applyExcelDateStyles(xlsx, sheet, dataColumns) {
     dataColumns.forEach(col => {
         if (col.exportable !== true) return;
         const ct = col.columnType?.toLowerCase();
+        if (ct === 'timestamp' || ct === 'datetime' || ct === 'date' || ct === 'dateformat') {
+            excelIdx++;
+            return;
+        }
         const fmt = ct ? EXCEL_DATE_FORMATS[ct] : null;
 
         if (fmt) {
@@ -208,6 +327,22 @@ function applyExcelDateStyles(xlsx, sheet, dataColumns) {
                     cell.removeAttr('t');
                 }
             });
+        }
+        excelIdx++;
+    });
+}
+
+function applyExcelTimestampColumnWidths(sheet, dataColumns) {
+    let excelIdx = 0;
+    dataColumns.forEach(col => {
+        if (col.exportable !== true) return;
+        const ct = (col.columnType || '').toLowerCase();
+        if (ct === 'timestamp' || ct === 'datetime' || ct === 'date' || ct === 'dateformat') {
+            const colNode = $('col', sheet).eq(excelIdx);
+            if (colNode.length) {
+                colNode.attr('width', ct === 'date' || ct === 'dateformat' ? '36' : '48');
+                colNode.attr('customWidth', '1');
+            }
         }
         excelIdx++;
     });
@@ -396,6 +531,94 @@ function appendExcelCurrencyTotalRow(xlsx, sheet, dataColumns, options = {}) {
     } catch (e) {
         console.error('appendExcelCurrencyTotalRow failed', e);
     }
+}
+
+function pdfCellText(cell) {
+    if (cell == null) {
+        return '';
+    }
+    if (typeof cell === 'string' || typeof cell === 'number') {
+        return String(cell);
+    }
+    if (typeof cell === 'object') {
+        if (Array.isArray(cell.text)) {
+            return cell.text.map(pdfCellText).join(' ');
+        }
+        return String(cell.text ?? '');
+    }
+    return '';
+}
+
+function parsePdfCurrencyValue(text) {
+    const raw = String(text || '').replace(/[^\d,-]/g, '').replace(/\./g, '').replace(',', '.');
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : 0;
+}
+
+function formatPdfRupiah(amount) {
+    const value = Math.round(Number(amount) || 0);
+    const abs = Math.abs(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (value < 0 ? 'Rp. -' : 'Rp. ') + abs;
+}
+
+function appendPdfCurrencyTotalRow(tableNode, dataColumns) {
+    const exportable = (dataColumns || []).filter((col) => col.exportable === true);
+    const body = tableNode?.table?.body;
+    if (!exportable.length || !Array.isArray(body) || body.length < 2) {
+        return;
+    }
+
+    const currencyIndexes = [];
+    exportable.forEach((col, idx) => {
+        const type = String(col.columnType || '').toLowerCase();
+        if (type === 'currency' || type === 'money' || type === 'rupiah') {
+            currencyIndexes.push(idx);
+        }
+    });
+    if (!currencyIndexes.length) {
+        return;
+    }
+
+    const colCount = body[0].length;
+    const totals = {};
+    currencyIndexes.forEach((idx) => {
+        totals[idx] = 0;
+    });
+
+    for (let r = 1; r < body.length; r++) {
+        const row = body[r] || [];
+        currencyIndexes.forEach((idx) => {
+            totals[idx] += parsePdfCurrencyValue(pdfCellText(row[idx]));
+        });
+    }
+
+    const totalRow = [];
+    for (let i = 0; i < colCount; i++) {
+        if (i === 0) {
+            totalRow.push({
+                text: 'TOTAL',
+                bold: true,
+                fillColor: '#ededed',
+                alignment: 'left',
+            });
+            continue;
+        }
+        if (currencyIndexes.includes(i)) {
+            totalRow.push({
+                text: formatPdfRupiah(totals[i]),
+                bold: true,
+                fillColor: '#ededed',
+                alignment: 'right',
+            });
+            continue;
+        }
+        totalRow.push({
+            text: '',
+            bold: true,
+            fillColor: '#ededed',
+        });
+    }
+    body.push(totalRow);
 }
 
 function getVerticalTopStyleForCell(xlsx, cell) {
@@ -637,6 +860,7 @@ function dtButtons(options, buttons) {
         excel: {
             extend: 'excel',
             title: '',
+            filename: options.excelFilename || '*',
             text: '<i class="ri ri-file-excel-line me-2"></i>Excel',
             exportOptions: {
                 columns: ':visible:not(.no-export)'
@@ -657,6 +881,7 @@ function dtButtons(options, buttons) {
 
                 applyStyleToColumns(sheet, rupiahStyleIndex, currencyColumns);
                 applyExcelDateStyles(xlsx, sheet, options.dataColumns);
+                applyExcelTimestampColumnWidths(sheet, options.dataColumns);
 
                 const duplicateCols = getDuplicateExportColumns(options.dataColumns);
                 mergeExcelDuplicates(xlsx, sheet, duplicateCols);
@@ -672,6 +897,7 @@ function dtButtons(options, buttons) {
         pdf: {
             extend: 'pdf',
             title: '',
+            filename: options.pdfFilename || '*',
             text: '<i class="ri ri-file-pdf-2-line me-2"></i>Pdf',
             modifier: {page: 'all'},
             orientation: options.pdfOrientation || 'portrait',
@@ -704,49 +930,97 @@ function dtButtons(options, buttons) {
                         });
                     }
                     const colCount = tableNode.table.body[0].length;
-                    const pageWidth = doc.pageOrientation === 'landscape' ? 842 : 595;
-                    const margins = doc.pageMargins || [10, 10, 10, 10];
-                    const usableWidth = pageWidth - margins[0] - margins[2] - 16;
-                    const colWidth = Math.max(usableWidth / colCount, 28);
+                    const pageWidth = resolvePdfPageWidth(doc, options);
+                    const margins = Array.isArray(doc.pageMargins) ? doc.pageMargins : [8, 8, 8, 8];
+                    const usableWidth = Math.max(pageWidth - (Number(margins[0]) || 0) - (Number(margins[2]) || 0), 120);
                     const exportableColumns = options.dataColumns.filter(col => col.exportable === true);
+                    const timestampIdx = {};
+                    exportableColumns.forEach((col, idx) => {
+                        const ct = (col.columnType || '').toLowerCase();
+                        if (ct === 'timestamp' || ct === 'datetime') {
+                            timestampIdx[idx] = true;
+                        }
+                    });
+                    const extraTs = Object.keys(timestampIdx).length * 28;
+                    const baseWidth = Math.max((usableWidth - extraTs) / Math.max(colCount, 1), 16);
 
+                    let widths;
                     if (options.pdfColumnWidths && exportableColumns.length === colCount) {
-                        tableNode.table.widths = exportableColumns.map(col => {
+                        widths = exportableColumns.map(col => {
                             const configured = options.pdfColumnWidths[col.data ?? 'no'];
-                            if (configured === '*') {
-                                return '*';
+                            if (configured === '*' || configured === 'auto') {
+                                return configured;
                             }
                             if (typeof configured === 'number') {
                                 return configured;
                             }
-                            return colWidth;
+                            return baseWidth;
                         });
                     } else if (options.pdfWidths && options.pdfWidths.length === colCount) {
-                        tableNode.table.widths = options.pdfWidths.map(width => {
+                        widths = options.pdfWidths.map(width => {
                             if (width === '*' || width === 'auto') {
                                 return width;
                             }
-                            return Number(width) || colWidth;
+                            return Number(width) || baseWidth;
                         });
                     } else {
-                        tableNode.table.widths = Array(colCount).fill(colWidth);
+                        widths = Array.from({ length: colCount }, (_, idx) => (
+                            timestampIdx[idx] ? baseWidth + 28 : baseWidth
+                        ));
                     }
 
+                    if (!widths.includes('*') && !widths.includes('auto')) {
+                        const numericSum = widths.reduce((sum, width) => sum + Number(width || 0), 0);
+                        if (numericSum > usableWidth) {
+                            const scale = usableWidth / numericSum;
+                            widths = widths.map(width => Math.max(14, Number(width) * scale));
+                        }
+                    } else {
+                        const numericSum = widths.reduce((sum, width) => (
+                            width === '*' || width === 'auto' ? sum : sum + Number(width || 0)
+                        ), 0);
+                        if (numericSum > usableWidth - 40) {
+                            const scale = (usableWidth - 80) / Math.max(numericSum, 1);
+                            widths = widths.map(width => (
+                                width === '*' || width === 'auto' ? width : Math.max(14, Number(width) * scale)
+                            ));
+                        }
+                    }
+                    tableNode.table.widths = widths;
+                    tableNode.width = usableWidth;
+
+                    const pad = options.pdfCellPadding ?? 1;
                     for (let rowIndex = 0; rowIndex < tableNode.table.body.length; rowIndex++) {
-                        tableNode.table.body[rowIndex].forEach(cell => {
+                        tableNode.table.body[rowIndex].forEach((cell, cellIndex) => {
+                            const alignment = rowIndex === 0 ? 'center' : 'left';
+                            if (typeof cell === 'string') {
+                                tableNode.table.body[rowIndex][cellIndex] = {
+                                    text: wrapPdfExportText(normalizeExportDateTimeText(cell)),
+                                    noWrap: false,
+                                    alignment: alignment,
+                                };
+                                return;
+                            }
                             if (cell && typeof cell === 'object') {
+                                if (typeof cell.text === 'string') {
+                                    cell.text = wrapPdfExportText(normalizeExportDateTimeText(cell.text));
+                                }
                                 cell.noWrap = false;
+                                cell.alignment = cell.alignment || alignment;
                             }
                         });
                     }
                     tableNode.layout = {
-                        hLineWidth: () => 0.5,
-                        vLineWidth: () => 0.5,
-                        paddingLeft: () => 2,
-                        paddingRight: () => 2,
-                        paddingTop: () => 2,
-                        paddingBottom: () => 2,
+                        hLineWidth: () => 0.4,
+                        vLineWidth: () => 0.4,
+                        paddingLeft: () => pad,
+                        paddingRight: () => pad,
+                        paddingTop: () => pad,
+                        paddingBottom: () => pad,
                     };
+                    if (options.pdfCurrencyTotal || options.excelCurrencyTotal) {
+                        appendPdfCurrencyTotalRow(tableNode, options.dataColumns);
+                    }
                 }
                 const duplicateCols = getDuplicateExportColumns(options.dataColumns);
                 mergePdfDuplicates(doc, duplicateCols);
@@ -765,9 +1039,10 @@ function dtButtons(options, buttons) {
                 const landscape = options.pdfOrientation === 'landscape'
                     || options.dataColumns.filter(col => col.exportable === true).length > 8;
                 const fontSize = options.pdfFontSize ?? 8;
+                const pageSize = String(options.pdfPageSize || 'A4').toUpperCase();
                 const style = win.document.createElement('style');
                 style.innerHTML = `
-                    @page { size: ${landscape ? 'landscape' : 'portrait'}; margin: 12mm; }
+                    @page { size: ${pageSize} ${landscape ? 'landscape' : 'portrait'}; margin: 10mm; }
                     body { font-size: ${fontSize}px; }
                     table { width: 100% !important; font-size: ${fontSize}px !important; table-layout: fixed; }
                     th, td { white-space: normal !important; word-break: break-word; padding: 2px 4px !important; }
@@ -796,7 +1071,7 @@ function dtButtons(options, buttons) {
                 body: function (data, row, column, node) {
                     if (data === null) return '';
                     const exportableColumns = options.dataColumns.filter(col => col.exportable === true);
-                    const columnInfo = exportableColumns[column];
+                    const columnInfo = exportableColumns[column] || options.dataColumns[column] || {};
                     let columnType = columnInfo.columnType;
 
                     const numberColumn = columnInfo.numberColumn;
@@ -804,7 +1079,7 @@ function dtButtons(options, buttons) {
                     // console.log(rawData)
                     // console.log(exportableColumns)
 
-                    if (columnType !== null) {
+                    if (columnType) {
                         switch (columnType.toLowerCase()) {
                             case 'row':
                             case 'number':
@@ -823,44 +1098,22 @@ function dtButtons(options, buttons) {
                                 };
                                 return basicDate.toLocaleDateString('id-ID', basicDateOptions);
                             case 'date':
-                            case 'dateformat':
+                            case 'dateformat': {
                                 if (!data) return '';
+                                const formattedDate = formatDateId(data);
                                 if (config.extend === 'excel') {
-                                    return dateToExcelSerial(new Date(data));
+                                    return '\u0000' + formattedDate;
                                 }
-                                let date = new Date(data);
-                                let dateOptions = {
-                                    weekday: 'long',
-                                    day: 'numeric',
-                                    month: 'long',
-                                    year: 'numeric'
-                                };
-                                return date.toLocaleDateString('id-ID', dateOptions);
+                                return formattedDate;
+                            }
                             case 'timestamp':
-                            case 'datetime':
-                                if (!data || data === '0000-00-00 00:00:00' || data === '0000-00-00') {
-                                    return '';
-                                }
+                            case 'datetime': {
+                                const formatted = formatDateTimeId(data, true, config.extend === 'pdf');
                                 if (config.extend === 'excel') {
-                                    const excelDate = new Date(data);
-                                    if (Number.isNaN(excelDate.getTime())) {
-                                        return '';
-                                    }
-                                    return dateToExcelSerial(excelDate);
+                                    return '\u0000' + formatted;
                                 }
-                                const tsDate = new Date(data);
-                                if (Number.isNaN(tsDate.getTime())) {
-                                    return '';
-                                }
-                                const tsOptions = {
-                                    weekday: 'long',
-                                    day: 'numeric',
-                                    month: 'long',
-                                    year: 'numeric',
-                                    hour: 'numeric',
-                                    minute: 'numeric'
-                                };
-                                return tsDate.toLocaleDateString('id-ID', tsOptions);
+                                return formatted;
+                            }
                             case 'periode':
                             case 'yearmonth':
                                 if (!data || typeof data !== 'string' || data.length !== 6 || !/^\d{6}$/.test(data)) {
@@ -1074,8 +1327,12 @@ async function dataTableCreate(options) {
                 }
 
                 const descriptions = {
+<<<<<<< HEAD
                     '401': 'Sesi anda telah habis, silahkan login kembali!',
                     '403': 'Anda tidak memiliki izin untuk mengakses data ini.',
+=======
+                    '401': 'Permintaan gagal diproses. Silakan coba lagi.',
+>>>>>>> e6c559c039a2946823e6b8cc468bc29492ed842b
                     '404': 'Data tidak ditemukan!',
                     '419': 'Sesi/CSRF sudah habis. Silahkan muat ulang halaman lalu coba lagi!',
                     '500': serverMessage || 'Internal Server Error',
@@ -1383,14 +1640,7 @@ async function getDT(options) {
                             case 'dateformat':
                                 renderFunc = function (data, type, row) {
                                     if (type === 'display' || type === 'filter') {
-                                        let date = new Date(data);
-                                        let options = {
-                                            weekday: 'long',
-                                            day: 'numeric',
-                                            month: 'long',
-                                            year: 'numeric'
-                                        };
-                                        return date.toLocaleDateString('id-ID', options);
+                                        return formatDateId(data);
                                     }
                                     return data;
                                 };
@@ -1414,22 +1664,7 @@ async function getDT(options) {
                             case 'datetime':
                                 renderFunc = function (data, type, row) {
                                     if (type === 'display' || type === 'filter') {
-                                        if (!data || data === '0000-00-00 00:00:00' || data === '0000-00-00') {
-                                            return '';
-                                        }
-                                        const date = new Date(data);
-                                        if (Number.isNaN(date.getTime())) {
-                                            return '';
-                                        }
-                                        const options = {
-                                            weekday: 'long',
-                                            day: 'numeric',
-                                            month: 'long',
-                                            year: 'numeric',
-                                            hour: 'numeric',
-                                            minute: 'numeric'
-                                        };
-                                        return date.toLocaleDateString('id-ID', options);
+                                        return formatDateTimeId(data, true);
                                     }
                                     return data;
                                 };
@@ -1741,7 +1976,7 @@ async function getDT(options) {
                     serverMessage = null;
                 }
                 const descriptions = {
-                    401: 'Sesi anda telah habis, silahkan login kembali!',
+                    401: 'Permintaan gagal diproses. Silakan coba lagi.',
                     403: 'Anda tidak memiliki izin untuk mengakses kolom data.',
                     404: 'Endpoint kolom data tidak ditemukan.',
                     419: 'Sesi/CSRF sudah habis. Silahkan muat ulang halaman lalu coba lagi!',

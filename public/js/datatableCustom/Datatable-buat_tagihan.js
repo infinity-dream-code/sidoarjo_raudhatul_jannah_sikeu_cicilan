@@ -109,14 +109,9 @@ function getDT(id, columnUrl, dataUrl, dataColumns, formId, thead) {
                         case 'dateFormat':
                             renderFunc = function (data, type, row) {
                                 if (type === 'display' || type === 'filter') {
-                                    let date = new Date(data);
-                                    let options = {
-                                        weekday: 'long',
-                                        day: 'numeric',
-                                        month: 'long',
-                                        year: 'numeric'
-                                    };
-                                    return date.toLocaleDateString('id-ID', options);
+                                    return typeof formatDateId === 'function'
+                                        ? formatDateId(data)
+                                        : String(data || '');
                                 }
                                 return data;
                             };
@@ -124,16 +119,9 @@ function getDT(id, columnUrl, dataUrl, dataColumns, formId, thead) {
                         case 'timeStamp':
                             renderFunc = function (data, type, row) {
                                 if (type === 'display' || type === 'filter') {
-                                    let date = new Date(data);
-                                    let options = {
-                                        weekday: 'long',
-                                        day: 'numeric',
-                                        month: 'long',
-                                        year: 'numeric',
-                                        hour: 'numeric',
-                                        minute: 'numeric'
-                                    };
-                                    return date.toLocaleDateString('id-ID', options);
+                                    return typeof formatDateTimeId === 'function'
+                                        ? formatDateTimeId(data, true)
+                                        : String(data || '');
                                 }
                                 return data;
                             };

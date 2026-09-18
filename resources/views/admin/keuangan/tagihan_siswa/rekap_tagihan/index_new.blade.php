@@ -298,7 +298,7 @@
 @section('script')
      <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-     <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+     <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
@@ -383,11 +383,11 @@
                             }
                         } else {
                             const errorMessages = {
-                                401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                401: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                                 404: 'Halaman yang dituju tidak ditemukan 🧐',
                                 405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                                419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                419: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                             };
                             errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -563,11 +563,11 @@
             //                 }
             //             } else {
             //                 const errorMessages = {
-            //                     401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+            //                     401: 'Permintaan gagal diproses. Silakan coba lagi.',
             //                     403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
             //                     404: 'Halaman yang dituju tidak ditemukan 🧐',
             //                     405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-            //                     419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+            //                     419: 'Permintaan gagal diproses. Silakan coba lagi.',
             //                     429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
             //                 };
             //                 errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -734,13 +734,15 @@
             ws.insertRow(3, ["Tahun Pelajaran", params.get('filter[tahun_pelajaran]') || 'Semua']);
             ws.insertRow(4, ["Periode Mulai", params.get('filter[periode_mulai]') || '-']);
             ws.insertRow(5, ["Periode Akhir", params.get('filter[periode_akhir]') || '-']);
-            ws.insertRow(6, ["Dari Tanggal", parseDDMMYYYY(params.get('filter[dari_tanggal]') || '') || '-']);
-            ws.insertRow(7, ["Sampai Tanggal", parseDDMMYYYY(params.get('filter[sampai_tanggal]') || '') || '-']);
-
-            [6, 7].forEach(rowNumber => {
-                const cell = ws.getRow(rowNumber).getCell(2);
-                if (cell.value instanceof Date) cell.numFmt = "dddd, dd mmmm yyyy";
-            });
+            const formatFilterDate = (value) => {
+                const parsed = parseDDMMYYYY(value || '');
+                if (!(parsed instanceof Date) || Number.isNaN(parsed.getTime())) return '-';
+                const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                return `${days[parsed.getDay()]}, ${parsed.getDate()} ${months[parsed.getMonth()]} ${parsed.getFullYear()}`;
+            };
+            ws.insertRow(6, ["Dari Tanggal", formatFilterDate(params.get('filter[dari_tanggal]'))]);
+            ws.insertRow(7, ["Sampai Tanggal", formatFilterDate(params.get('filter[sampai_tanggal]'))]);
             [1,2,3,4,5,6,7].forEach(rowNumber => {
                 ws.getRow(rowNumber).eachCell({includeEmpty: true}, cell => cell.font = {bold: true});
             });
@@ -886,11 +888,11 @@
                     }
                 } else {
                     const errorMessages = {
-                        401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                        401: 'Permintaan gagal diproses. Silakan coba lagi.',
                         403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                         404: 'Halaman yang dituju tidak ditemukan 🧐',
                         405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                        419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                        419: 'Permintaan gagal diproses. Silakan coba lagi.',
                         429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                     };
                     errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -950,11 +952,11 @@
                         }
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -1016,11 +1018,11 @@
                         errorAlert(error.message || 'Gagal membuat rekap per NIS');
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");

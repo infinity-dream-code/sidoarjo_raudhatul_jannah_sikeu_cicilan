@@ -84,7 +84,7 @@
 
 @section('script')
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/select2/select2.min.js')}}"></script>
 
     <form id="formImport" enctype="multipart/form-data" class="mainForm"
@@ -107,7 +107,7 @@
                             <li class="list-group-item list-group-timeline-danger">Yang diimpor adalah <span class="fw-bold">sheet yang sedang aktif</span> saat file Excel disimpan (bukan selalu sheet paling kiri).</li>
                             <li class="list-group-item list-group-timeline-danger">Contoh file yang dapat diproses untuk import:
                                 <a class="btn btn-sm btn-outline-primary fw-bolder"
-                                   href="{{asset('TEMPLATE MENU UPLOAD DATA SISWA.xlsx')}}?v=20260903"
+                                   href="{{asset('TEMPLATE MENU UPLOAD DATA SISWA.xlsx')}}?v=20260912"
                                    download>
                                     <i class="ri ri-file-excel-line me-2"></i>Contoh File
                                 </a>
@@ -420,11 +420,11 @@
                                 }
                             } else {
                                 const errorMessages = {
-                                    401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                    401: 'Permintaan gagal diproses. Silakan coba lagi.',
                                     403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                                     404: 'Halaman yang dituju tidak ditemukan 🧐',
                                     405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                                    419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                    419: 'Permintaan gagal diproses. Silakan coba lagi.',
                                     429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                                 };
                                 errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -488,11 +488,11 @@
                             }
                         } else {
                             const errorMessages = {
-                                401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                401: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                                 404: 'Halaman yang dituju tidak ditemukan 🧐',
                                 405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                                419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                419: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                             };
                             errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");

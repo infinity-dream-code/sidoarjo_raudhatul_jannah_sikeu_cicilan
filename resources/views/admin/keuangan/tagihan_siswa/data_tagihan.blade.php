@@ -241,9 +241,19 @@
                                 </select>
                             </div>
                             <div class="mb-5">
-                                <label class="form-label" for="post">
-                                    Nama Tagihan
-                                </label>
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                                    <label class="form-label mb-0" for="post">
+                                        Nama Tagihan
+                                    </label>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-primary" id="post-select-all">
+                                            Pilih semua
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" id="post-clear">
+                                            Kosongkan
+                                        </button>
+                                    </div>
+                                </div>
                                 <select class="form-select" id="post"
                                         name="filter[post][]"
                                         multiple
@@ -258,6 +268,7 @@
                                         <option>data kosong</option>
                                     @endisset
                                 </select>
+                                <small class="text-muted">Pilih semua, lalu hapus centang nama tagihan yang tidak ingin ditampilkan.</small>
                             </div>
                         </div>
                         <div class="col">
@@ -654,7 +665,11 @@
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
     <script src="{{asset('js/va-format.js')}}?v=20260619"></script>
+<<<<<<< HEAD
     <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260913-ajax-error"></script>
+=======
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260916-pdf-va"></script>
+>>>>>>> e6c559c039a2946823e6b8cc468bc29492ed842b
     <script>
         window.DATA_TAGIHAN_BOOT = {
             columnUrl: @json($columnsUrl ?? null),
@@ -662,9 +677,10 @@
             prefetchedColumns: @json($tableColumns ?? []),
         };
     </script>
-    <script src="{{asset('js/data-tagihan-init.js')}}?v=20260907-expired"></script>
+    <script src="{{asset('js/data-tagihan-init.js')}}?v=20260914-pdf-total"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
+    <script src="{{asset('js/unlimited-daterange.js')}}?v=20260911-no-limit"></script>
 
     <script type="module">
         import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
@@ -712,9 +728,29 @@
             excelCurrencyTotal: true,
             pdfOrientation: 'landscape',
             pdfPageSize: 'A3',
-            pdfMargins: [10, 14, 10, 14],
-            pdfFontSize: 6,
-            pdfHeaderFontSize: 7,
+            pdfMargins: [6, 8, 6, 8],
+            pdfFontSize: 5.5,
+            pdfHeaderFontSize: 6,
+            pdfCellPadding: 1,
+            pdfColumnWidths: {
+                no: 'auto',
+                NOCUST: 44,
+                NUM2ND: 36,
+                NOVA: 62,
+                NMCUST: 72,
+                CODE02: 'auto',
+                DESC02: 'auto',
+                DESC03: 'auto',
+                BILLAC: 'auto',
+                BILLNM: '*',
+                CICILAN: 'auto',
+                BILLAM_TOTAL: 50,
+                BILLAM: 46,
+                BILLPAID: 50,
+                PAIDDT: 72,
+                ExpDate: 42,
+                FUrutan: 'auto',
+            },
         };
 
         function initDataTagihanTable() {
@@ -1472,11 +1508,11 @@
                         }
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -1535,6 +1571,7 @@
                     $.ajax(ajaxOptions).done(function (response, status, xhr) {
                         try {
                             let blob = new Blob([response], {type: 'application/pdf'});
+                            const filename = 'cetak-rekap-data-tagihan.pdf';
                             if (typeof window.navigator.msSaveBlob !== 'undefined') {
                                 window.navigator.msSaveBlob(blob, filename);
                             } else {
@@ -1576,43 +1613,28 @@
             if (select2.length) {
                 select2.each(function () {
                     let $this = $(this);
-                    // select2Focus($this);
+                    const isPostFilter = this.id === 'post';
                     $this.wrap('<div class="position-relative"></div>').select2({
-                        placeholder: 'Select value',
-                        dropdownParent: $this.parent()
+                        placeholder: $this.data('placeholder') || 'Select value',
+                        dropdownParent: $this.parent(),
+                        closeOnSelect: !isPostFilter,
+                        allowClear: isPostFilter
                     });
                 });
             }
 
-            let date = $('#tanggal-pembuatan');
-            date.daterangepicker({
-                autoUpdateInput: false,
-                todayHighlight: true,
-                autoclose: true,
-                locale: {
-                    format: 'DD-MM-YYYY',
-                    separator: " - ",
-                    applyLabel: "Terapkan",
-                    cancelLabel: "Batal",
-                    fromLabel: "Dari",
-                    toLabel: "Ke",
-                    customRangeLabel: "Kustom",
-                    daysOfWeek: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"],
-                    monthNames: ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
-                    firstDay: 0,
-                },
-                maxDate: moment()
+            $('#post-select-all').on('click', function () {
+                const $post = $('#post');
+                const values = $post.find('option').map(function () {
+                    return this.value;
+                }).get();
+                $post.val(values).trigger('change');
+            });
+            $('#post-clear').on('click', function () {
+                $('#post').val(null).trigger('change');
             });
 
-            date.on('apply.daterangepicker hide.daterangepicker', function (ev, picker) {
-                if (picker.startDate && picker.endDate) {
-                    $(this).val(picker.startDate.format('DD-MM-YYYY') + ' ~ ' + picker.endDate.format('DD-MM-YYYY'));
-                }
-            });
-
-            date.on('cancel.daterangepicker', function (ev, picker) {
-                $(this).val('');
-            });
+            bindUnlimitedDateRange('#tanggal-pembuatan');
 
             pdfMake.fonts = {
                 Times: {
@@ -1644,7 +1666,7 @@
             const tandaTangan = @json($tanda_tangan);
             const userName = @json(Auth::user()?->name ?? Auth::user()?->users ?? '');
             const domisili = "{{ config('app.domisili') }}";
-            const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd, D MMMM YYYY') }}";
+            const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd D MMMM YYYY') }}";
             const APP_VA_PREFIX = @json((string) (config('app.nova') ?: '797783'));
             const showVA = (nis) => typeof formatNoVA === 'function'
                 ? formatNoVA(nis, APP_VA_PREFIX)
@@ -1655,7 +1677,7 @@
                     return APP_VA_PREFIX + digits.padStart(padLen, '0');
                 })();
 
-            async function generatePdf(title, bodyContent, unit_logo = false) {
+            async function generatePdf(title, bodyContent, unit_logo = false, fileTitle = null) {
                 try {
                     let logo = 'data:image/jpeg;base64,' + headerLogo;
 
@@ -1665,9 +1687,6 @@
 
                     const orientation = 'portrait';
                     const pageMargins = [20, 20, 20, 20];
-                    const tanggalSekarang = new Date().toLocaleDateString('id-ID', {
-                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                    });
                     const availableWidth = getContentWidth('A4', orientation, pageMargins);
 
                     // Header (shared)
@@ -1753,10 +1772,11 @@
                     ];
 
                     // PDF definition
+                    const docTitle = String(fileTitle || title || 'Kartu Tagihan Siswa');
                     const docDefinition = {
                         info: {
-                            title: String(title || 'KARTU TAGIHAN SISWA').toUpperCase(),
-                            subject: 'KARTU TAGIHAN SISWA'
+                            title: docTitle.toUpperCase(),
+                            subject: docTitle
                         },
                         pageSize: 'A4',
                         pageOrientation: orientation,
@@ -1823,7 +1843,7 @@
                         throw createError("Data Tagihan Kosong", 422);
                     }
                     const data = await generateKartuSiswa(result);
-                    const pdf = await generatePdf('KARTU TAGIHAN SISWA', data, unit)
+                    const pdf = await generatePdf('Kartu Tagihan Siswa', data, unit, 'Cetak Kartu Siswa - Data Tagihan')
                     // if (!result['tagihans'] || result['tagihans'].length === 0) {
                     //     console.log('kosong');
                     //     const error = new Error("Data Tagihan Kosong");
@@ -1843,11 +1863,11 @@
                         }
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -1904,16 +1924,11 @@
                         return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
                     };
 
+                    const pad2 = (n) => String(n).padStart(2, '0');
                     const formatPaidDate = (val) => {
                         const dt = parsePaidDate(val);
                         if (!dt) return '-';
-                        return dt.toLocaleString('id-ID', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
+                        return `${pad2(dt.getDate())}-${pad2(dt.getMonth() + 1)}-${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}:${pad2(dt.getSeconds())}`;
                     };
 
                     const bodyContent = [];

@@ -70,7 +70,7 @@
 
 @section('script')
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('js/helper/errorInputHelper.min.js')}}"></script>
     <script src="{{asset('main/libs/select2/select2.min.js')}}"></script>
 
@@ -228,7 +228,7 @@
                                 }
                             } else {
                                 const errorMessages = {
-                                    419: "Sesi anda telah habis, Silahkan Login Kembali",
+                                    419: "Permintaan gagal diproses. Silakan coba lagi.",
                                     500: "Tidak dapat terhubung ke server, Silahkan periksa koneksi internet anda",
                                     403: "Anda tidak memiliki izin untuk mengakses halaman ini",
                                     404: "Halaman tidak ditemukan"

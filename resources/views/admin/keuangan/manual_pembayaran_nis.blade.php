@@ -51,18 +51,17 @@
                     </div>
                     <div class="col-12">
                         <div class="mb-5">
-                            <label class="form-label" for="tahun_pelajaran">
-                                Tahun Pelajaran
+                            <label class="form-label" for="filter_periode">
+                                Periode
                             </label>
-                            <select class="form-select" id="tahun_pelajaran"
-                                    name="filter[tahun_pelajaran]"
+                            <select class="form-select" id="filter_periode"
+                                    name="filter[periode]"
                                     data-control="select2"
-                                    data-placeholder="Pilih Tahun Pelajaran">
+                                    data-placeholder="Pilih Periode">
                                 <option value="all">Semua</option>
-                                @isset($thn_aka)
-                                    @foreach($thn_aka as $item)
-                                        <option
-                                            value="{{$item->thn_aka}}">{{$item->thn_aka}}</option>
+                                @isset($periode)
+                                    @foreach($periode as $item)
+                                        <option value="{{$item}}">{{$item}}</option>
                                     @endforeach
                                 @else
                                     <option>data kosong</option>
@@ -176,7 +175,7 @@
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
     <script src="{{asset('js/helper/formattedNumber.min.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
 
     <script type="module">
         import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
@@ -310,7 +309,7 @@
                                 processErros(errors)
                             }
                         } else if (xhr.status === 419) {
-                            errorAlert('Sesi anda telah habis, Silahkan Login Kembali')
+                            errorAlert('Permintaan gagal diproses. Silakan coba lagi.')
                         } else if (xhr.status === 500) {
                             errorAlert('Tidak dapat terhubung ke server, Silahkan periksa koneksi internet anda')
                         } else if (xhr.status === 403) {
@@ -409,16 +408,25 @@
                 const sisaBayar = Number(rowData.sisa_bayar ?? rowData.BILLAM) || 0;
                 const canCicil = Number(rowData.can_cicil ?? 0) === 1;
 
-                input.prop('disabled', false).prop('readonly', false).attr('required', true);
+                input.prop('disabled', false).attr('required', true);
                 input.removeAttr('max min');
                 input.attr('data-sisa-bayar', sisaBayar);
+                input.attr('data-can-cicil', canCicil ? '1' : '0');
                 input.attr('title', canCicil
                     ? 'Tagihan ini dapat dicicil'
                     : 'Tagihan ini tidak dapat dicicil, pembayaran harus lunas');
 
-                const current = parseNominal(input.val());
-                if (fillDefault && current <= 0 && sisaBayar > 0) {
-                    input.val(formatNominal(sisaBayar));
+                if (canCicil) {
+                    input.prop('readonly', false);
+                    const current = parseNominal(input.val());
+                    if (fillDefault && current <= 0 && sisaBayar > 0) {
+                        input.val(formatNominal(sisaBayar));
+                    }
+                } else {
+                    input.prop('readonly', true);
+                    if (sisaBayar > 0) {
+                        input.val(formatNominal(sisaBayar));
+                    }
                 }
             };
 
@@ -605,11 +613,11 @@
                         }
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -664,7 +672,7 @@
                             }
                         }
                         if (response.status === 419) {
-                            msg = 'Sesi anda telah habis, Silahkan Login Kembali';
+                            msg = 'Permintaan gagal diproses. Silakan coba lagi.';
                         } else if (response.status === 403) {
                             msg = 'Anda tidak memiliki izin untuk mengakses halaman ini';
                         } else if (response.status === 404) {
@@ -714,7 +722,7 @@
                     if (xhr.status === 422) {
                         errorAlert('Data tidak ditemukan')
                     } else if (xhr.status === 419) {
-                        errorAlert('Sesi anda telah habis, Silahkan Login Kembali')
+                        errorAlert('Permintaan gagal diproses. Silakan coba lagi.')
                     } else if (xhr.status === 500) {
                         errorAlert('Tidak dapat terhubung ke server, Silahkan periksa koneksi internet anda')
                     } else if (xhr.status === 403) {
@@ -796,7 +804,7 @@
             const tandaTangan = @json($tanda_tangan);
             const userName = "{{ Auth::user()->name }}";
             const domisili = "{{ config('app.domisili') }}";
-            const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd, D MMMM YYYY') }}";
+            const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd D MMMM YYYY') }}";
             const APP_VA_PREFIX = @json((string) (config('app.nova') ?: '797783'));
             const showVA = (nis) => typeof formatNoVA === 'function'
                 ? formatNoVA(nis, APP_VA_PREFIX)
@@ -892,9 +900,11 @@
 
                     const orientation = 'portrait';
                     const pageMargins = [20, 20, 20, 20];
-                    const tanggalSekarang = new Date().toLocaleDateString('id-ID', {
-                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                    });
+                    const tanggalSekarang = typeof formatDateId === 'function'
+                        ? formatDateId(new Date())
+                        : new Date().toLocaleDateString('id-ID', {
+                            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                        }).replace(/^([^,]+),\s+/, '$1 ');
                     const availableWidth = getContentWidth('A4', orientation, pageMargins);
 
                     const headerTable = {
@@ -1014,12 +1024,14 @@
                 if (Number.isNaN(parsed.getTime())) {
                     return '-';
                 }
-                return parsed.toLocaleDateString('id-ID', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                });
+                return typeof formatDateId === 'function'
+                    ? formatDateId(parsed)
+                    : parsed.toLocaleDateString('id-ID', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                    }).replace(/^([^,]+),\s+/, '$1 ');
             }
 
             async function generateKuitansi(data) {

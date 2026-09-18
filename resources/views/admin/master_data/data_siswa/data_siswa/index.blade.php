@@ -459,7 +459,7 @@
 
 
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.min.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/select2/select2.min.js')}}"></script>
     <script src="{{asset('js/helper/errorInputHelper.min.js')}}"></script>
 
@@ -740,11 +740,11 @@
                 }
 
                 const errorMessages = {
-                    401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman atau login kembali!',
+                    401: 'Permintaan gagal diproses. Silakan coba lagi.',
                     403: 'Anda tidak memiliki izin untuk mengakses 😖',
                     404: 'Halaman tidak ditemukan 🧐',
                     405: 'Metode tidak valid 🧐 <br>Silakan coba lagi!',
-                    419: 'Sesi anda sudah habis 🙏 <br>Silahkan login kembali!',
+                    419: 'Permintaan gagal diproses. Silakan coba lagi.',
                     429: 'Terlalu banyak permintaan 🙏 <br>Tunggu beberapa saat!',
                 };
 

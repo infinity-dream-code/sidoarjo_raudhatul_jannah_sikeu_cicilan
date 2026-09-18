@@ -6,6 +6,10 @@
     <link rel="stylesheet" href="{{asset('main/libs/datatables-responsive-bs5/responsive.bootstrap5.css')}}">
     <link rel="stylesheet" href="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.css')}}">
     <style>
+        #main_table_wrapper .dt-buttons {
+            display: none !important;
+        }
+
         .select2-container--default .select2-results__option[aria-disabled=true] {
             display: none;
         }
@@ -221,8 +225,11 @@
                                 <label class="form-label" for="filter[siswa]">
                                     NIS
                                 </label>
-                                <input class="form-control" id="filter[siswa]" name="filter[siswa]"
-                                       placeholder="Masukkan NIS" data-placeholder="Pilih NIS">
+                                <select class="form-select" id="filter[siswa]" name="filter[siswa]"
+                                        data-control="select2-ajax-siswa"
+                                        data-placeholder="Masukkan NIS / No. Pendaftaran / Nama Siswa">
+                                    <option value=""></option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -284,9 +291,10 @@
 @section('script')
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260723-excel-total"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
+    <script src="{{asset('js/unlimited-daterange.js')}}?v=20260911-no-limit"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 
@@ -310,6 +318,7 @@
             pageLength: 10,
             lengthMenu: [10, 25, 50, 75, 100],
             buttons: ['excel'],
+            excelFilename: 'data pembayaran - export excel',
             excelCurrencyTotal: true,
         };
 
@@ -332,6 +341,7 @@
                                     $this.trigger('change');
                                 });
                             }
+                            $('[data-control="select2-ajax-siswa"]').val(null).trigger('change');
                         }, 0)
                     });
                 }
@@ -391,6 +401,54 @@
                     });
                 });
             }
+
+            (function initSiswaSelect2Ajax() {
+                const $siswaAjax = $('[data-control="select2-ajax-siswa"]');
+                if (!$siswaAjax.length || typeof $.fn.select2 !== 'function') {
+                    setTimeout(initSiswaSelect2Ajax, 200);
+                    return;
+                }
+                if ($siswaAjax.hasClass('select2-hidden-accessible')) {
+                    $siswaAjax.select2('destroy');
+                }
+                $siswaAjax.select2({
+                    allowClear: true,
+                    width: '100%',
+                    dropdownParent: $(document.body),
+                    placeholder: $siswaAjax.data('placeholder') || 'Masukkan NIS / No. Pendaftaran / Nama Siswa',
+                    ajax: {
+                        url: '{{ route('admin.master-data.data-siswa.get-siswa-select2') }}',
+                        dataType: 'json',
+                        delay: 300,
+                        data: function (params) {
+                            return { term: params.term };
+                        },
+                        processResults: function (data) {
+                            return { results: Array.isArray(data) ? data : [] };
+                        },
+                        cache: true
+                    },
+                    language: {
+                        inputTooShort: function () {
+                            return 'Masukkan NIS atau No. Pendaftaran atau Nama Siswa';
+                        },
+                        noResults: function () {
+                            const term = $siswaAjax.data('select2')?.$dropdown?.find('.select2-search__field').val()
+                                || $('.select2-container--open .select2-search__field').val()
+                                || '';
+                            const w = $.isNumeric(term) ? 'NIS' : 'Nama';
+                            return 'Siswa dengan ' + w + ': <span class="bg-label-danger"><b>' + term + '</b></span> tidak ditemukan!';
+                        },
+                        searching: function () {
+                            return 'Mencari Siswa ......';
+                        }
+                    },
+                    escapeMarkup: function (markup) {
+                        return markup;
+                    },
+                    minimumInputLength: 3,
+                });
+            })();
 
             $("[name='filter[unit]']").on('change', function () {
                 const $kelasSelect = $("[name='filter[kelas]']");
@@ -458,37 +516,9 @@
                 }
             });
 
-            let date = $('#tanggal-transaksi');
+            bindUnlimitedDateRange('#tanggal-transaksi');
             const periodeMulai = $('#filter_periode_mulai');
             const periodeAkhir = $('#filter_periode_akhir');
-            date.daterangepicker({
-                autoUpdateInput: false,
-                todayHighlight: true,
-                autoclose: true,
-                locale: {
-                    format: 'DD-MM-YYYY',
-                    separator: " - ",
-                    applyLabel: "Terapkan",
-                    cancelLabel: "Batal",
-                    fromLabel: "Dari",
-                    toLabel: "Ke",
-                    customRangeLabel: "Kustom",
-                    daysOfWeek: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"],
-                    monthNames: ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
-                    firstDay: 0,
-                },
-                maxDate: moment()
-            });
-
-            date.on('apply.daterangepicker', function (ev, picker) {
-                if (picker.startDate && picker.endDate) {
-                    $(this).val(picker.startDate.format('DD-MM-YYYY') + ' ~ ' + picker.endDate.format('DD-MM-YYYY'));
-                }
-            });
-
-            date.on('cancel.daterangepicker', function () {
-                $(this).val('');
-            });
 
             periodeMulai.on('change', function () {
                 const val = $(this).val();
@@ -510,6 +540,12 @@
 
             document.getElementById('cetak-kartu-siswa').addEventListener('click', function (e) {
                 e.preventDefault();
+                let data = DT[`${dtOptions.tableId}`].rows({selected: true}).data();
+
+                if (!data[0]) {
+                    warningAlert('silahkan pilih siswa!')
+                    return;
+                }
                 loadingAlert(`Membuat Kartu Siswa ... <br> Proses ini membutuhkan waktu beberapa saat<br><hr>
                     <p><span class="badge badge-dot bg-danger me-1"></span> Pastikan browser anda tidak memblokir <i>POP-UP</i>! </p>
                 `);
@@ -518,12 +554,6 @@
                 const params = new URLSearchParams();
                 for (const [key, value] of form.entries()) {
                     params.append(key, value);
-                }
-                let data = DT[`${dtOptions.tableId}`].rows({selected: true}).data();
-
-                if (!data[0]) {
-                    warningAlert('silahkan pilih siswa!')
-                    return;
                 }
                 params.append('custid', data[0].CUSTID ?? data[0].custid ?? '')
                 const fullUrl = `${url}?${params.toString()}`;
@@ -535,12 +565,38 @@
                             'Accept': 'application/pdf'
                         }
                     });
+                const pdfTabTitle = 'data pembayaran - kartu siswa';
 
                 fetch(request)
-                    .then(res => res.blob())
+                    .then(async res => {
+                        const blob = await res.blob();
+                        if (!res.ok || (blob.type && blob.type.indexOf('pdf') === -1 && blob.type.indexOf('octet-stream') === -1)) {
+                            let message = 'Tagihan Tidak Ditemukan';
+                            try {
+                                const text = await blob.text();
+                                const json = JSON.parse(text);
+                                message = json.message || json.error || message;
+                            } catch (err) { /* ignore */ }
+                            const error = new Error(message);
+                            error.status = res.status;
+                            throw error;
+                        }
+                        return blob;
+                    })
                     .then(blob => {
-                        const url = URL.createObjectURL(blob);
-                        window.open(url, '_blank');
+                        const fileUrl = URL.createObjectURL(blob);
+                        const tab = window.open('', '_blank');
+                        if (!tab) {
+                            window.open(fileUrl, '_blank');
+                        } else {
+                            tab.document.write(
+                                '<!DOCTYPE html><html><head><title>' + pdfTabTitle + '</title></head>' +
+                                '<body style="margin:0">' +
+                                '<embed src="' + fileUrl + '" type="application/pdf" style="border:0;width:100%;height:100vh">' +
+                                '</body></html>'
+                            );
+                            tab.document.close();
+                        }
                         successAlert('Sukses, Rekap terbuka pada tab baru');
                     })
                     .catch(error => {
@@ -552,11 +608,11 @@
                             }
                         } else {
                             const errorMessages = {
-                                401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                401: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                                 404: 'Halaman yang dituju tidak ditemukan 🧐',
                                 405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                                419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                419: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                             };
                             errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -601,11 +657,11 @@
                             }
                         } else {
                             const errorMessages = {
-                                401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                401: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                                 404: 'Halaman yang dituju tidak ditemukan 🧐',
                                 405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                                419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                419: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                             };
                             errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -668,11 +724,11 @@
                         }
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -825,7 +881,9 @@
                 [4, 5].forEach(rowNumber => {
                     const cell = ws.getRow(rowNumber).getCell(2);
                     if (cell.value instanceof Date) {
-                        cell.numFmt = "dddd, dd mmmm yyyy";
+                        cell.value = typeof formatDateId === 'function'
+                            ? formatDateId(cell.value)
+                            : cell.value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/^([^,]+),\s*/, '$1 ');
                     }
                     ws.getColumn(2).width = Math.max(ws.getColumn(2).width || 10, 30);
                 });

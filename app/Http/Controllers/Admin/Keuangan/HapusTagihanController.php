@@ -75,30 +75,61 @@ class HapusTagihanController extends Controller
 
     public function getData(Request $request)
     {
+        try {
+            return $this->buildGetDataResponse($request);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('hapus-tagihan.get-data.failed', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'draw' => (int) $request->get('draw'),
+                'recordsTotal' => 0,
+                'recordsFiltered' => 0,
+                'data' => [],
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function buildGetDataResponse(Request $request)
+    {
         $draw = $request->get('draw');
-        $start = $request->get("start");
-        $rowperpage = $request->get("length");
-        $columnName_arr = $request->get('columns');
-        $search_arr = $request->get('search');
+        $start = max(0, (int) $request->get('start', 0));
+        $rowperpage = (int) $request->get('length', 10);
+        if ($rowperpage < 1) {
+            $rowperpage = 10;
+        }
+        $columnName_arr = $request->get('columns', []);
+        $search_arr = $request->get('search', []);
 
         $defaultColumn = 'scctbill.PAIDDT';
         $defaultOrder = 'desc';
+        $columnName = $defaultColumn;
+        $columnSortOrder = $defaultOrder;
+        $searchValue = $search_arr['value'] ?? '';
 
-        if ($request->has('order')) {
-            $columnIndex_arr = $request->get('order');
-            $columnIndex = $columnIndex_arr[0]['column'];
-            $columnSortOrder = $columnIndex_arr[0]['dir'];
-        } else {
-            $columnIndex = $defaultColumn;
-            $columnSortOrder = $defaultOrder;
-        }
-
-        $columnName = $columnName_arr[$columnIndex]['data'];
-        $searchValue = $search_arr['value'];
-
-        if (!$columnName || $columnName == 'no') {
-            $columnName = $defaultColumn;
-            $columnSortOrder = $defaultOrder;
+        $orderArr = $request->get('order');
+        $sortable = [
+            'nocust' => 'scctcust.nocust',
+            'nmcust' => 'scctcust.nmcust',
+            'CODE02' => 'scctcust.CODE02',
+            'DESC02' => 'scctcust.DESC02',
+            'DESC03' => 'scctcust.DESC03',
+            'BILLNM' => 'scctbill.BILLNM',
+            'BILLAC' => 'scctbill.BILLAC',
+            'AA' => 'scctbill.AA',
+            'nominal' => 'scctbill.BILLAM',
+        ];
+        if (is_array($orderArr) && $orderArr !== [] && is_array($columnName_arr) && $columnName_arr !== []) {
+            $columnIndex = (int) ($orderArr[0]['column'] ?? -1);
+            $requested = $columnName_arr[$columnIndex]['data'] ?? null;
+            if ($requested && isset($sortable[$requested])) {
+                $columnName = $sortable[$requested];
+                $columnSortOrder = strtolower((string) ($orderArr[0]['dir'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+            }
         }
 
         $filters = [];
@@ -198,7 +229,7 @@ class HapusTagihanController extends Controller
             })
             ->where('scctbill.PAIDST', 0)
             ->where('scctbill.FSTSBolehBayar', 1)
-            ->where('scctcust.STCUST', 1);
+            ->whereRaw('CAST(COALESCE(scctcust.STCUST, 0) AS SIGNED) = 1');
 
         SchoolScope::apply($query, 'scctcust', $this->sekolah);
 
@@ -234,10 +265,12 @@ class HapusTagihanController extends Controller
             ->skip($start)
             ->take($rowperpage)
             ->get()
-            ->map(function ($item, $index) {
+            ->map(function ($item) {
                 $item->delete = true;
-                $item->item_id = $item['AA'];
-                $item->CUSTID = $item['CUSTID'];
+                $item->item_id = $item->AA;
+                $item->CUSTID = $item->CUSTID;
+                $item->nocust = $item->nocust ?? $item->NOCUST ?? '';
+                $item->nmcust = $item->nmcust ?? $item->NMCUST ?? '';
                 $item->billam = $item->nominal;
                 return $item;
             })->toArray();

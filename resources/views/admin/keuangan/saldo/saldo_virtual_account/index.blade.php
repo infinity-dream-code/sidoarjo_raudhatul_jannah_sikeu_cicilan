@@ -154,7 +154,7 @@
 
 @section('script')
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/select2/id.min.js')}}"></script>
 
@@ -175,11 +175,26 @@
             pageLength: 10,
             lengthMenu: [10, 25, 50, 75, 100],
             buttons: ['copy', 'excel', 'pdf', 'print'],
+            excelFilename: 'saldo VA - export excel',
+            pdfFilename: 'saldo VA - export pdf',
             pdfOrientation: 'landscape',
-            pdfPageSize: 'A4',
-            pdfMargins: [16, 20, 16, 20],
-            pdfFontSize: 8,
-            pdfHeaderFontSize: 9,
+            pdfPageSize: 'A3',
+            pdfMargins: [8, 10, 8, 10],
+            pdfFontSize: 7,
+            pdfHeaderFontSize: 8,
+            pdfCellPadding: 1,
+            pdfColumnWidths: {
+                no: 28,
+                NOCUST: 55,
+                NOVA: 95,
+                NMCUST: '*',
+                CODE02: 48,
+                DESC02: 42,
+                DESC03: 52,
+                NUM2ND: 72,
+                DESC04: 58,
+                saldo: 70,
+            },
         };
 
         document.addEventListener("DOMContentLoaded", function () {
@@ -244,6 +259,17 @@
             if (toolbar && !toolbar.children.length) {
                 toolbar.remove();
             }
+
+            dataTransaksiBtn.addEventListener('click', function (e) {
+                const siswa = ($(`#${dtOptions.formId} [name="filter[siswa]"]`).val() || '').trim();
+                if (!siswa) {
+                    return;
+                }
+                e.preventDefault();
+                const url = new URL(this.getAttribute('href'), window.location.origin);
+                url.searchParams.set('siswa', siswa);
+                window.location.href = url.toString();
+            });
         }
 
     </script>

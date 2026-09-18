@@ -8,6 +8,7 @@ use App\Models\mst_tagihan;
 use App\Models\mst_thn_aka;
 use App\Models\scctbill;
 use App\Models\scctcust;
+use App\Models\sccttran;
 use App\Models\ValidationMessage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -97,8 +98,10 @@ class EditManualController extends Controller
             'nama' => $item->NMCUST ?? $item->nmcust ?? null,
             'CODE02' => $item->CODE02,
             'CODE03' => $item->CODE03,
-            'kelas' => trim(($item->DESC02 ?? '') . ' ' . ($item->DESC03 ?? '')),
+            'kelas' => $item->DESC02,
+            'kelompok' => $item->DESC03,
             'jenjang' => $item->DESC02,
+            'unit' => $item->CODE02,
             'angkatan' => $item->DESC04 ?? $item->angkatan ?? null,
         ];
     }
@@ -129,6 +132,29 @@ class EditManualController extends Controller
             ->where('FSTSBolehBayar', 1)
             ->orderBy('FUrutan', 'asc')
             ->get();
+
+        $maxInstallmentByBill = collect();
+        $billIds = $tagihan->pluck('AA')->filter()->values()->all();
+        if (!empty($billIds)) {
+            $maxInstallmentByBill = sccttran::query()
+                ->whereIn('BILLID', $billIds)
+                ->selectRaw('BILLID, MAX(INSTALLMENT) as max_inst')
+                ->groupBy('BILLID')
+                ->pluck('max_inst', 'BILLID');
+        }
+
+        $tagihan->transform(function ($item) use ($maxInstallmentByBill) {
+            $fromBill = (int) ($item->INSTALLMENT ?? 0);
+            $fromTran = (int) (
+                $maxInstallmentByBill[$item->AA]
+                ?? $maxInstallmentByBill[(string) $item->AA]
+                ?? $maxInstallmentByBill[(int) $item->AA]
+                ?? 0
+            );
+            $item->CICIL_KE = max($fromBill, $fromTran);
+
+            return $item;
+        });
 
         return response()->json($tagihan);
     }
@@ -191,8 +217,9 @@ class EditManualController extends Controller
         }
 
         $billPaid = (int) ($tagihan->BILLPAID ?? 0);
-        if ($billPaid > 0 || (int) ($tagihan->isINSTALLABLE ?? 0) > 0) {
-            return response()->json(['message' => 'Tagihan yang sudah pernah dibayar (cicilan) tidak bisa diedit di sini!'], 422);
+        $installment = (int) ($tagihan->INSTALLMENT ?? 0);
+        if ($billPaid > 0 || $installment > 0) {
+            return response()->json(['message' => 'Tagihan yang sudah pernah dicicil tidak bisa diedit di sini!'], 422);
         }
 
         $totalTagihan = (int) preg_replace('/\D/', '', (string) $request->nominal);

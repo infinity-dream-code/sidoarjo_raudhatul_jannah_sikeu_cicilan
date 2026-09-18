@@ -198,7 +198,7 @@
 @section('script')
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260724-excel-total"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
 
@@ -219,7 +219,25 @@
             pageLength: 10,
             lengthMenu: [10, 25, 50, 75, 100],
             buttons: ["excel", "pdf", "print"],
+            excelFilename: 'data transfer VA - cetak excel',
+            pdfFilename: 'data transfer VA - export pdf',
             excelCurrencyTotal: true,
+            pdfOrientation: 'landscape',
+            pdfPageSize: 'A3',
+            pdfMargins: [8, 10, 8, 10],
+            pdfFontSize: 7,
+            pdfHeaderFontSize: 8,
+            pdfCellPadding: 1,
+            pdfColumnWidths: {
+                no: 24,
+                NOCUST: 52,
+                NOVA: 92,
+                NMCUST: '*',
+                METODE: 50,
+                TRXDATE: 128,
+                NOREFF: 78,
+                NOMINAL: 70,
+            },
         };
 
         document.addEventListener("DOMContentLoaded", function () {
@@ -287,7 +305,7 @@
             {{--            if (xhr.status === 422) {--}}
             {{--                errorAlert('Tidak dapat mencetak')--}}
             {{--            } else if (xhr.status === 419) {--}}
-            {{--                errorAlert('Sesi anda telah habis, Silahkan Login Kembali');--}}
+            {{--                errorAlert('Permintaan gagal diproses. Silakan coba lagi.');--}}
             {{--            } else if (xhr.status === 403) {--}}
             {{--                errorAlert('Anda tidak memiliki izin untuk mengakses halaman ini');--}}
             {{--            } else if (xhr.status === 404) {--}}

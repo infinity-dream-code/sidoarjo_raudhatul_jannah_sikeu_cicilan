@@ -228,9 +228,10 @@
 @section('script')
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
+    <script src="{{asset('js/unlimited-daterange.js')}}?v=20260911-no-limit"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 
@@ -338,34 +339,10 @@
                 }
             });
 
-            let startOfMonth = moment().startOf('month');
-            let today = moment();
-            let date = $('#tanggal-transaksi');
-            date.daterangepicker({
-                startDate: startOfMonth,
-                endDate: today,
+            bindUnlimitedDateRange('#tanggal-transaksi', {
+                startDate: moment().startOf('month'),
+                endDate: moment(),
                 autoUpdateInput: true,
-                todayHighlight: true,
-                autoclose: true,
-                locale: {
-                    format: 'DD-MM-YYYY',
-                    separator: " - ",
-                    applyLabel: "Terapkan",
-                    cancelLabel: "Batal",
-                    fromLabel: "Dari",
-                    toLabel: "Ke",
-                    customRangeLabel: "Kustom",
-                    daysOfWeek: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"],
-                    monthNames: ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
-                    firstDay: 0,
-                },
-                maxDate: moment()
-            });
-
-            date.on('apply.daterangepicker hide.daterangepicker', function (ev, picker) {
-                if (picker.startDate && picker.endDate) {
-                    $(this).val(picker.startDate.format('DD-MM-YYYY') + ' ~ ' + picker.endDate.format('DD-MM-YYYY'));
-                }
             });
 
             function generateTableRow(data, kelas) {
@@ -431,8 +408,11 @@
 
                 [4, 5].forEach(rowNumber => {
                     const cell = ws.getRow(rowNumber).getCell(2);
-
-                    cell.numFmt = "dddd, dd mmmm yyyy";
+                    if (cell.value instanceof Date) {
+                        cell.value = typeof formatDateId === 'function'
+                            ? formatDateId(cell.value)
+                            : cell.value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/^([^,]+),\s*/, '$1 ');
+                    }
                 });
 
                 const boldRows = [1, 2, 3, 4, 5];
@@ -473,7 +453,9 @@
 
                     row.eachCell({ includeEmpty: true }, cell => {
                         if (cell.value instanceof Date) {
-                            cell.numFmt = "dddd, dd mmmm yyyy";
+                            cell.value = typeof formatDateId === 'function'
+                                ? formatDateId(cell.value)
+                                : cell.value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/^([^,]+),\s*/, '$1 ');
                         }
 
                         if (typeof cell.value === "number") {
@@ -592,11 +574,11 @@
                             }
                         } else {
                             const errorMessages = {
-                                401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                401: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                                 404: 'Halaman yang dituju tidak ditemukan 🧐',
                                 405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                                419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                419: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                             };
                             errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");

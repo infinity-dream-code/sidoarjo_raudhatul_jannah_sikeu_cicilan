@@ -2,6 +2,10 @@
 @section('title',$dataTitle??$mainTitle??$title??'')
 @section('style')
     <style>
+        #main_table_wrapper .dt-buttons {
+            display: none !important;
+        }
+
         table.dataTable tr.selected {
             border-top: 2px solid var(--bs-primary);
             border-bottom: 2px solid var(--bs-primary);
@@ -395,7 +399,7 @@
 
     {{--    <script src="{{asset('main/libs/select2/select2.full.min.js')}}"></script>--}}
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260723-android-bill-noreff"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/moment/moment.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
 
@@ -489,6 +493,7 @@
             pageLength: 10,
             lengthMenu: [10, 25, 50, 75, 100],
             buttons: ['excel'],
+            excelFilename: 'tagihan lunas - export excel',
             excelCurrencyTotal: true,
         };
 
@@ -751,11 +756,11 @@
                         }
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -900,7 +905,7 @@
             const tandaTangan = @json($tanda_tangan);
             const userName = "{{ Auth::user()->name }}";
             const domisili = "{{ config('app.domisili') }}";
-            const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd, D MMMM YYYY') }}";
+            const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd D MMMM YYYY') }}";
             const APP_VA_PREFIX = @json((string) (config('app.nova') ?: '797783'));
             const showVA = (nis) => typeof formatNoVA === 'function'
                 ? formatNoVA(nis, APP_VA_PREFIX)
@@ -910,7 +915,7 @@
                     return APP_VA_PREFIX + digits.padStart(16 - APP_VA_PREFIX.length, '0');
                 })();
 
-            async function generatePdf(title, bodyContent, unit_logo = false) {
+            async function generatePdf(title, bodyContent, unit_logo = false, fileTitle = null) {
                 try {
                     let logo = 'data:image/jpeg;base64,' + headerLogo;
 
@@ -920,9 +925,11 @@
 
                     const orientation = 'portrait';
                     const pageMargins = [20, 20, 20, 20];
-                    const tanggalSekarang = new Date().toLocaleDateString('id-ID', {
-                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                    });
+                    const tanggalSekarang = typeof formatDateId === 'function'
+                        ? formatDateId(new Date())
+                        : new Date().toLocaleDateString('id-ID', {
+                            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                        }).replace(/^([^,]+),\s+/, '$1 ');
                     const availableWidth = getContentWidth('A4', orientation, pageMargins);
 
                     const headerTable = {
@@ -1007,10 +1014,11 @@
                     ];
 
                     // PDF definition
+                    const docTitle = String(fileTitle || title || 'Kartu Pembayaran Siswa');
                     const docDefinition = {
                         info: {
-                            title: String(title || 'KARTU PEMBAYARAN SISWA').toUpperCase(),
-                            subject: 'KARTU PEMBAYARAN SISWA'
+                            title: docTitle,
+                            subject: docTitle
                         },
                         pageSize: 'A4',
                         pageOrientation: orientation,
@@ -1093,11 +1101,11 @@
                             }
                         } else {
                             const errorMessages = {
-                                401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                401: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                                 404: 'Halaman yang dituju tidak ditemukan 🧐',
                                 405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                                419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                                419: 'Permintaan gagal diproses. Silakan coba lagi.',
                                 429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                             };
                             errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");
@@ -1208,7 +1216,7 @@
                 if (!Array.isArray(rows) || rows.length === 0) {
                     generatePdf('REKAP DATA PENERIMAAN', [
                         {text: 'Tidak ada data', alignment: 'center', margin: [0, 20, 0, 0]}
-                    ]);
+                    ], false, 'data tagihan lunas - rekap pdf');
                     return;
                 }
 
@@ -1219,15 +1227,18 @@
 
                 rows.forEach((item, index) => {
                     const tanggalBayar = item.PAIDDT
-                        ? new Date(item.PAIDDT).toLocaleString('id-ID', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit'
-                        })
+                        ? (typeof formatDateTimeId === 'function'
+                            ? formatDateTimeId(item.PAIDDT)
+                            : new Date(item.PAIDDT).toLocaleString('id-ID', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false
+                            }).replace(/^([^,]+),\s+/, '$1 ').replace(/(\d{1,2})\.(\d{2})\.(\d{2})/, '$1:$2:$3'))
                         : '-';
 
                     tableBody.push([
@@ -1259,7 +1270,7 @@
                         margin: [0, 0, 0, 10],
                         fontSize: 8
                     }
-                ]);
+                ], false, 'data tagihan lunas - rekap pdf');
             }
 
             function generateKuitansi(biayaLayanan = false) {
@@ -1358,12 +1369,14 @@
                 data.forEach((item, index) => {
                     let tanggalBayar = item.PAIDDT ?? item.TRXDATE;
                     if (tanggalBayar && tanggalBayar !== '' && tanggalBayar !== '0000-00-00 00:00:00') {
-                        tanggalBayar = new Date(tanggalBayar).toLocaleDateString('id-ID', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                        });
+                        tanggalBayar = typeof formatDateId === 'function'
+                            ? formatDateId(tanggalBayar)
+                            : new Date(tanggalBayar).toLocaleDateString('id-ID', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric'
+                            }).replace(/^([^,]+),\s+/, '$1 ');
                     }
 
                     const billAm = Number(item.BILLAM_TOTAL ?? item.BILLAM ?? 0);
@@ -1472,7 +1485,7 @@
                 }
 
                 Swal.close();
-                generatePdf('KUITANSI', content, siswa.CODE02);
+                generatePdf('KUITANSI', content, siswa.CODE02, 'data tagihan lunas - cetak kuitansi');
             }
 
             document.getElementById('cetak-kuitansi').addEventListener('click', async function (e) {
@@ -1519,7 +1532,7 @@
                         throw createError("Data Tagihan Kosong", 422);
                     }
                     const data = await generateKartuSiswa(result);
-                    const pdf = await generatePdf('KARTU PEMBAYARAN SISWA', data, unit)
+                    const pdf = await generatePdf('KARTU PEMBAYARAN SISWA', data, unit, 'data tagihan lunas - kartu siswa')
                     // if (!result['tagihans'] || result['tagihans'].length === 0) {
                     //     console.log('kosong');
                     //     const error = new Error("Data Tagihan Kosong");
@@ -1539,11 +1552,11 @@
                         }
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan! <br> jika masalah masih terjadi silahkan login kembali!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || "Terjadi kesalahan, silahkan coba memuat ulang halaman");

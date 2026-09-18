@@ -5,7 +5,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{config('app.nama_instansi')??'Sistem Keuangan'}}</title>
+    <title>Cetak Rekap - Data Tagihan</title>
 
     <style type="text/css">
         * {
@@ -193,7 +193,7 @@
                 </tr>
                 <tr>
                     <td  class="text-center breakable" width="80%">
-                        <p style="margin-left: -7%; margin-top: 0;margin-bottom: 0;">{{config('app.alamat')}}</p>
+                        <p style="margin-left: -7%; margin-top: 0;margin-bottom: 0;">{{ stripos((string) config('app.alamat'), 'semarang') !== false ? 'Kota Sidoarjo, Prov. Jawa Timur' : config('app.alamat') }}</p>
                     </td>
                 </tr>
                 <tr>
@@ -226,8 +226,22 @@
 
 <br/>
 
+@php
+    $grandTagihan = 0;
+    $grandTerbayar = 0;
+    $grandSisa = 0;
+    $kota = $domisili ?? config('app.domisili') ?: 'Sidoarjo';
+    if (stripos((string) $kota, 'semarang') !== false) {
+        $kota = 'Sidoarjo';
+    }
+@endphp
 @foreach($posts as $post)
     @if(count($post['tagihans']) > 0)
+        @php
+            $sumTagihan = 0;
+            $sumTerbayar = 0;
+            $sumSisa = 0;
+        @endphp
 
         <h3>{{$post->kode}} - {{$post->tagihan}}</h3>
         <table width="100%" class="table-border">
@@ -294,43 +308,53 @@
                     <td class="text-end">@rupiah($billPaid)</td>
                     <td class="text-end">@rupiah($paymentLeft)</td>
                 </tr>
+                @php
+                    $sumTagihan += $billAm;
+                    $sumTerbayar += $billPaid;
+                    $sumSisa += $paymentLeft;
+                @endphp
             @endforeach
             </tbody>
+            <tfoot style="background-color: #ededed; font-weight: bold;">
+            <tr>
+                <td colspan="5" class="text-end">Total {{ $post->tagihan }}</td>
+                <td class="text-end">@rupiah($sumTagihan)</td>
+                <td class="text-end">@rupiah($sumTerbayar)</td>
+                <td class="text-end">@rupiah($sumSisa)</td>
+            </tr>
+            </tfoot>
         </table>
         <br>
+        @php
+            $grandTagihan += $sumTagihan;
+            $grandTerbayar += $sumTerbayar;
+            $grandSisa += $sumSisa;
+        @endphp
     @endif
 @endforeach
+<table width="100%" class="table-border">
+    <tr style="background-color: #ededed; font-weight: bold;">
+        <td>Total Keseluruhan</td>
+        <td class="text-end">Tagihan: @rupiah($grandTagihan)</td>
+        <td class="text-end">Terbayar: @rupiah($grandTerbayar)</td>
+        <td class="text-end">Sisa: @rupiah($grandSisa)</td>
+    </tr>
+</table>
 <br>
 <br>
 <table style="width: 100%">
-    <tfoot>
     <tr>
-        <td colspan="5" style="color: #fff;">TESTING</td>
-        <td style="color: #fff;">TESTING</td>
-        <td align="right">{{config('app.domisili')}}</td>
+        <td></td>
+        <td align="right">{{ $kota }}, {{ Carbon::now()->locale('id')->isoFormat('dddd D MMMM YYYY') }}</td>
     </tr>
     <tr>
-        <td colspan="5" style="color: #fff;">TESTING</td>
-        <td style="color: #fff;">TESTING</td>
-        <td align="right">{{Carbon::now()->isoFormat('dddd, D MMMM YYYY')}}</td>
+        <td></td>
+        <td align="right" style="height: 70px;"></td>
     </tr>
     <tr>
-        <td colspan="5" style="color: #fff;">TESTING</td>
-        <td style="color: #fff;">TESTING</td>
-        <td align="right"></td>
-    </tr>
-    <tr>
-        <td colspan="5" style="color: #fff;">TESTING</td>
-        <td style="color: #fff;">KOSONG</td>
-        <td align="right"></td>
-    </tr>
-    TESTING
-    <tr>
-        <td colspan="5" style="color: #fff;">TESTING</td>
-        <td style="color: #fff;">KOSONG</td>
+        <td></td>
         <td align="right">Bagian Keuangan</td>
     </tr>
-    </tfoot>
 </table>
 
 </body>

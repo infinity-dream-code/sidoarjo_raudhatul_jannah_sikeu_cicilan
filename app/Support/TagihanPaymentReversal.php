@@ -49,9 +49,21 @@ class TagihanPaymentReversal
 
     public function deleteUnpaidTagihan(scctbill $tagihan, Request $request): void
     {
-        if ($this->hasBillPayments($tagihan)) {
-            $this->reverseAllPayments($tagihan, $request);
-            $tagihan->refresh();
+        try {
+            if ($this->hasBillPayments($tagihan)) {
+                $this->reverseAllPayments($tagihan, $request);
+                $tagihan->refresh();
+            }
+        } catch (\Throwable $e) {
+            Log::error('hapus-tagihan.reverse_failed', [
+                'aa' => $tagihan->AA,
+                'custid' => $tagihan->CUSTID,
+                'message' => $e->getMessage(),
+            ]);
+
+            if (!$this->isCancelPaymentSaldoMissing($e)) {
+                throw $e;
+            }
         }
 
         $tagihan->update([
@@ -112,6 +124,19 @@ class TagihanPaymentReversal
         do {
             $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } while ($stmt->nextRowset());
+    }
+
+    private function isCancelPaymentSaldoMissing(\Throwable $e): bool
+    {
+        $message = $e->getMessage();
+
+        return stripos($message, 'CancelPaymentSaldo') !== false
+            && (
+                stripos($message, 'does not exist') !== false
+                || stripos($message, "doesn't exist") !== false
+                || stripos($message, 'unknown procedure') !== false
+                || stripos($message, '1305') !== false
+            );
     }
 
     private function resolveCyberKeyUserId(): string

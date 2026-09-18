@@ -57,10 +57,11 @@ class ManualPembayaranController extends Controller
             ['data' => 'nocust', 'name' => 'NIS', 'searchable' => true, 'orderable' => true],
             ['data' => 'NUM2ND', 'name' => 'NO. DAFTAR', 'searchable' => true, 'orderable' => true],
             ['data' => 'kelas_label', 'name' => 'Kelas', 'searchable' => true, 'orderable' => false],
-            ['data' => 'NOVA', 'name' => 'NO. VA', 'searchable' => true, 'orderable' => false, 'columnType' => 'nova_edit'],
+            ['data' => 'NOVA', 'name' => 'NO. VA', 'searchable' => true, 'orderable' => false],
             ['data' => 'nmcust', 'name' => 'NAMA', 'searchable' => true, 'orderable' => true],
             ['data' => 'BILLNM', 'name' => 'Nama Tagihan', 'searchable' => true, 'orderable' => true],
-            ['data' => 'BILLAC', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'columnType' => 'periode'],
+            ['data' => 'BILLAC', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'className' => 'text-center'],
+            ['data' => 'CICILAN', 'name' => 'Cicilan', 'searchable' => true, 'orderable' => true, 'className' => 'text-center'],
             ['data' => 'BILLAM', 'name' => 'Tagihan', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end'],
             ['data' => 'PAYMENTLEFT', 'name' => 'Sisa Tagihan', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end'],
             [
@@ -114,7 +115,8 @@ class ManualPembayaranController extends Controller
                 }
             }
 
-            $tahun_pelajaran = data_get($request->input('filter', []), 'tahun_pelajaran');
+            $periode = data_get($request->input('filter', []), 'periode', data_get($request->input('filter', []), 'tahun_pelajaran'));
+            $cicilanFilter = strtolower(trim((string) data_get($request->input('filter', []), 'cicilan', 'all')));
 
             $whereAny = [
                 'scctcust.nmcust',
@@ -133,6 +135,7 @@ class ManualPembayaranController extends Controller
                 'scctbill.BTA',
                 'scctbill.FIDBANK',
                 'scctbill.NOREFF',
+                'scctbill.isINSTALLABLE',
                 'scctbill.FUrutan',
                 'scctcust.CUSTID',
                 'scctcust.CODE02',
@@ -148,8 +151,8 @@ class ManualPembayaranController extends Controller
                 ->where('scctbill.PAIDST', '=', 0)
                 ->where('scctbill.FSTSBolehBayar', '=', 1)
                 ->tap(fn ($q) => SchoolScope::apply($q, 'scctcust'))
-                ->when($tahun_pelajaran && $tahun_pelajaran != 'all', function ($query) use ($tahun_pelajaran) {
-                    return $query->where('scctbill.BTA', '=', $tahun_pelajaran);
+                ->when($periode && $periode != 'all', function ($query) use ($periode) {
+                    return $query->where('scctbill.BILLAC', '=', $periode);
                 })
             ->groupBy('scctbill.AA');
 
@@ -176,14 +179,24 @@ class ManualPembayaranController extends Controller
                     }
                     $item->PAYMENTLEFT = $this->resolvePaymentLeft($item);
                     $item->sisa_bayar = $item->PAYMENTLEFT;
-                    $item->can_cicil = mst_tagihan::canInstallment($item->BILLNM) ? 1 : 0;
+                    $item->can_cicil = ((int) ($item->isINSTALLABLE ?? 0) === 1 || mst_tagihan::canInstallment($item->BILLNM)) ? 1 : 0;
+                    $item->CICILAN = $item->can_cicil ? 'Ya' : 'Tidak';
                     $item->FIDBANK = MetodeBayarHelper::resolveDisplayFidBank(
                         $item->FIDBANK !== null ? (string) $item->FIDBANK : null,
                         $item->NOREFF !== null ? (string) $item->NOREFF : null
                     );
                     unset($item->AA);
                     return $item;
-                })->toArray();
+                });
+
+            if (in_array($cicilanFilter, ['ya', '1', 'yes'], true)) {
+                $records = $records->filter(fn ($item) => (int) ($item->can_cicil ?? 0) === 1)->values();
+            } elseif (in_array($cicilanFilter, ['tidak', '0', 'no'], true)) {
+                $records = $records->filter(fn ($item) => (int) ($item->can_cicil ?? 0) !== 1)->values();
+            }
+
+            $totalRecords = $records->count();
+            $records = $records->toArray();
         }
 
         $response = array(
@@ -202,11 +215,12 @@ class ManualPembayaranController extends Controller
         $data['dataTitle'] = $this->dataTitle;
         $data['showTitle'] = $this->showTitle;
         $data['columnsUrl'] = $this->columnsUrl;
-        $data['thn_aka'] = \App\Models\mst_thn_aka::select(['thn_aka'])
-            ->whereNotNull('thn_aka')
+        $data['periode'] = scctbill::query()
+            ->whereNotNull('BILLAC')
+            ->where('BILLAC', '!=', '')
             ->distinct()
-            ->orderBy('thn_aka', 'desc')
-            ->get();
+            ->orderBy('BILLAC', 'desc')
+            ->pluck('BILLAC');
 
         $data['datasUrl'] = $this->datasUrl;
 //        $data['thn_aka'] = mst_thn_aka::where('thn_aka', '!=', null)->get();

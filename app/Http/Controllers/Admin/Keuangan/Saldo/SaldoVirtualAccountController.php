@@ -82,6 +82,60 @@ class SaldoVirtualAccountController extends Controller
         }
     }
 
+    /**
+     * Cari siswa by NIS / No VA / no daftar / nama.
+     * NIS di DB sering berpadding nol atau tersimpan numerik, jadi dicocokkan setelah TRIM/CAST.
+     */
+    private function applySiswaLookup($query, string $input, bool $asGroup = true): void
+    {
+        $input = trim($input);
+        if ($input === '') {
+            return;
+        }
+
+        $sanitize = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $input);
+        $like = '%' . $sanitize . '%';
+        $digits = preg_replace('/\D+/', '', $input) ?? '';
+        $prefix = scctcust::vaPrefix();
+
+        $nisCandidates = [];
+        if ($digits !== '') {
+            $nisCandidates[] = $digits;
+            $nisCandidates[] = ltrim($digits, '0') ?: '0';
+
+            if ($prefix !== '' && str_starts_with($digits, $prefix) && strlen($digits) > strlen($prefix)) {
+                $fromVa = substr($digits, strlen($prefix));
+                $nisCandidates[] = $fromVa;
+                $nisCandidates[] = ltrim($fromVa, '0') ?: '0';
+            }
+        }
+        $nisCandidates = array_values(array_unique(array_filter($nisCandidates, static fn ($v) => $v !== '')));
+
+        $apply = function ($q) use ($like, $digits, $nisCandidates) {
+            $q->orWhereRaw('TRIM(CAST(scctcust.NOCUST AS CHAR)) LIKE ?', [$like])
+                ->orWhereRaw('TRIM(CAST(scctcust.NUM2ND AS CHAR)) LIKE ?', [$like])
+                ->orWhere('scctcust.NMCUST', 'like', $like);
+
+            if ($digits !== '') {
+                $q->orWhereRaw('TRIM(CAST(scctcust.NOCUST AS CHAR)) LIKE ?', ['%' . $digits . '%'])
+                    ->orWhereRaw('TRIM(CAST(scctcust.NUM2ND AS CHAR)) LIKE ?', ['%' . $digits . '%']);
+            }
+
+            foreach ($nisCandidates as $nis) {
+                $q->orWhereRaw('TRIM(CAST(scctcust.NOCUST AS CHAR)) = ?', [$nis])
+                    ->orWhereRaw("TRIM(LEADING '0' FROM TRIM(CAST(scctcust.NOCUST AS CHAR))) = ?", [ltrim($nis, '0') ?: '0'])
+                    ->orWhereRaw('TRIM(CAST(scctcust.NUM2ND AS CHAR)) = ?', [$nis]);
+            }
+        };
+
+        if ($asGroup) {
+            $query->where($apply);
+            return;
+        }
+
+        $apply($query);
+    }
+
     public function __construct()
     {
         $this->middleware(function ($request, $next) {
@@ -332,22 +386,21 @@ class SaldoVirtualAccountController extends Controller
             $columnName = 'scctcust.' . $columnName;
         }
 
+        $siswaFilter = '';
         $filter = $request->input('filter');
         if ($filter) {
             foreach ($filter as $key => $val) {
-                if (strtolower($val) != 'all' && $val !== null && $val !== '') {
+                if (strtolower((string) $val) != 'all' && $val !== null && $val !== '') {
                     $colName = match ($key) {
                         'kelas' => 'scctcust.DESC02',
                         'sekolah' => 'scctcust.CODE01',
-                        'siswa' => 'scctcust.nmcust',
+                        'siswa' => 'scctcust.NOCUST',
                         'angkatan' => 'scctcust.DESC04',
                         'saldo_positif' => '_saldo_positif',
                         default => null
                     };
                     if ($key == 'siswa') {
-                        $val = is_numeric($val) ? $val : '%' . $val . '%';
-                        $colName = is_numeric($val) ? 'scctcust.NOCUST' : $colName;
-                        ($colName) && $filters[] = [$colName, 'like', $val];
+                        $siswaFilter = trim((string) $val);
                     } else if ($key == 'kelas') {
                         $filters[] = ['scctcust.CODE03', '=', $val];
                     } else if ($key === 'sekolah') {
@@ -411,12 +464,13 @@ class SaldoVirtualAccountController extends Controller
             });
         }
 
+        if ($siswaFilter !== '') {
+            $this->applySiswaLookup($query, $siswaFilter);
+        }
+
         if (!blank($searchValue)) {
-            $query->where(function ($q) use ($whereAny, $searchValue) {
-                $sanitizeSearch = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $searchValue);
-                foreach ($whereAny as $column) {
-                    $q->orWhere($column, 'like', '%' . $sanitizeSearch . '%');
-                }
+            $query->where(function ($q) use ($searchValue) {
+                $this->applySiswaLookup($q, $searchValue, false);
             });
         }
 
@@ -651,6 +705,7 @@ class SaldoVirtualAccountController extends Controller
         $data['pageTitle'] = 'Data Transaksi';
         $data['columnsUrl'] = route('admin.keuangan.saldo.saldo-virtual-account.data-transaksi.get-column');
         $data['datasUrl'] = route('admin.keuangan.saldo.saldo-virtual-account.data-transaksi.get-data');
+        $data['prefillSiswa'] = trim((string) request()->query('siswa', request()->query('nis', '')));
 
         return view('admin.keuangan.saldo.saldo_virtual_account.data_transaksi', $data);
     }
@@ -660,9 +715,9 @@ class SaldoVirtualAccountController extends Controller
         return [
             ['data' => null, 'name' => 'no', 'columnType' => 'row', 'exportable' => true],
             ['data' => 'NOCUST', 'name' => 'NIS', 'searchable' => true, 'orderable' => true, 'exportable' => true],
-            ['data' => 'NOVA', 'name' => 'No VA', 'exportable' => true],
+            ['data' => 'NOVA', 'name' => 'No VA', 'searchable' => true, 'exportable' => true],
             ['data' => 'NMCUST', 'name' => 'Nama', 'searchable' => true, 'orderable' => true, 'exportable' => true],
-            ['data' => 'TRXDATE', 'name' => 'Tanggal', 'orderable' => true, 'columnType' => 'timestamp', 'exportable' => true],
+            ['data' => 'TRXDATE', 'name' => 'Tanggal Bayar', 'orderable' => true, 'columnType' => 'timestamp', 'exportable' => true],
             ['data' => 'METODE', 'name' => 'Metode', 'orderable' => true, 'exportable' => true],
             ['data' => 'DEBET', 'name' => 'Debet', 'orderable' => true, 'className' => 'text-end', 'columnType' => 'currency', 'exportable' => true],
             ['data' => 'KREDIT', 'name' => 'Kredit', 'orderable' => true, 'className' => 'text-end', 'columnType' => 'currency', 'exportable' => true],
@@ -704,9 +759,15 @@ class SaldoVirtualAccountController extends Controller
             }
         }
 
+        $siswaFilter = '';
         $filter = $request->input('filter', []);
         foreach ($filter as $key => $val) {
             if ($val === null || $val === '' || strtolower((string) $val) === 'all') {
+                continue;
+            }
+
+            if (in_array($key, ['siswa', 'nis'], true)) {
+                $siswaFilter = trim((string) $val);
                 continue;
             }
 
@@ -727,14 +788,6 @@ class SaldoVirtualAccountController extends Controller
             $filters[] = ['scctcust.CODE01', 'in', $schoolCodes];
         }
 
-        $whereAny = [
-            'scctcust.NOCUST',
-            'scctcust.NMCUST',
-            'scctcust.NUM2ND',
-            'sccttran.NOREFF',
-            'sccttran.METODE',
-        ];
-
         $query = sccttran::query()
             ->leftJoin('scctcust', 'scctcust.CUSTID', '=', 'sccttran.CUSTID');
 
@@ -746,12 +799,16 @@ class SaldoVirtualAccountController extends Controller
             }
         }
 
+        if ($siswaFilter !== '') {
+            $this->applySiswaLookup($query, $siswaFilter);
+        }
+
         if (!blank($searchValue)) {
             $sanitizeSearch = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $searchValue);
-            $query->where(function ($q) use ($whereAny, $sanitizeSearch) {
-                foreach ($whereAny as $column) {
-                    $q->orWhere($column, 'like', '%' . $sanitizeSearch . '%');
-                }
+            $query->where(function ($q) use ($searchValue, $sanitizeSearch) {
+                $this->applySiswaLookup($q, $searchValue, false);
+                $q->orWhere('sccttran.NOREFF', 'like', '%' . $sanitizeSearch . '%')
+                    ->orWhere('sccttran.METODE', 'like', '%' . $sanitizeSearch . '%');
             });
         }
 
@@ -781,6 +838,14 @@ class SaldoVirtualAccountController extends Controller
                     $item->NOVA = scctcust::showVA($item->NOCUST);
                 } else {
                     $item->NOVA = scctcust::showVA($item->NUM2ND);
+                }
+
+                if (!empty($item->TRXDATE)) {
+                    try {
+                        $item->TRXDATE = Carbon::parse($item->TRXDATE)->format('Y-m-d H:i:s');
+                    } catch (\Throwable $e) {
+                        // biarkan nilai asli
+                    }
                 }
 
                 return $item;

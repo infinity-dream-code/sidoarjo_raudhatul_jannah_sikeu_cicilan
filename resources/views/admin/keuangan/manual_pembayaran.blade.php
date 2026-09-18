@@ -52,23 +52,38 @@
                             </select>
                         </div>
                     </div>
-                    <div class="col-12">
+                    <div class="col-lg-6">
                         <div class="mb-5">
-                            <label class="form-label" for="tahun_pelajaran">
-                                Tahun Pelajaran
+                            <label class="form-label" for="filter_periode">
+                                Periode
                             </label>
-                            <select class="form-select" id="tahun_pelajaran"
-                                    name="filter[tahun_pelajaran]"
+                            <select class="form-select" id="filter_periode"
+                                    name="filter[periode]"
                                     data-control="select2"
-                                    data-placeholder="Pilih Tahun Pelajaran">
+                                    data-placeholder="Pilih Periode">
                                 <option value="all">Semua</option>
-                                @isset($thn_aka)
-                                    @foreach($thn_aka as $item)
-                                        <option value="{{$item->thn_aka}}">{{$item->thn_aka}}</option>
+                                @isset($periode)
+                                    @foreach($periode as $item)
+                                        <option value="{{$item}}">{{$item}}</option>
                                     @endforeach
                                 @else
                                     <option>data kosong</option>
                                 @endisset
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="mb-5">
+                            <label class="form-label" for="filter_cicilan">
+                                Cicilan
+                            </label>
+                            <select class="form-select" id="filter_cicilan"
+                                    name="filter[cicilan]"
+                                    data-control="select2"
+                                    data-placeholder="Pilih Cicilan">
+                                <option value="all">Semua</option>
+                                <option value="ya">Ya</option>
+                                <option value="tidak">Tidak</option>
                             </select>
                         </div>
                     </div>
@@ -199,7 +214,7 @@
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
     <script src="{{asset('main/libs/bootstrap-datepicker/bootstrap-datepicker.js')}}"></script>
     <script src="{{asset('js/helper/formattedNumber.min.js')}}"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.min.js')}}?v=20260916-pdf-va"></script>
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.12/pdfmake.min.js"
             integrity="sha512-axXaF5grZBaYl7qiM6OMHgsgVXdSLxqq0w7F4CQxuFyrcPmn0JfnqsOtYHUun80g6mRRdvJDrTCyL8LQqBOt/Q=="
@@ -378,7 +393,7 @@
                             const errors = JSON.parse(xhr.responseText).error;
                             if (errors) processErros(errors);
                         } else if (xhr.status === 419) {
-                            errorAlert('Sesi anda telah habis, Silahkan Login Kembali');
+                            errorAlert('Permintaan gagal diproses. Silakan coba lagi.');
                         } else if (xhr.status === 500) {
                             errorAlert('Tidak dapat terhubung ke server, Silahkan periksa koneksi internet anda');
                         } else if (xhr.status === 403) {
@@ -429,14 +444,23 @@
                 const sisaBayar = Number(rowData.sisa_bayar !== undefined ? rowData.sisa_bayar : rowData.BILLAM) || 0;
                 const canCicil = Number(rowData.can_cicil !== undefined ? rowData.can_cicil : 0) === 1;
 
-                input.prop('disabled', false).prop('readonly', false).attr('required', true);
+                input.prop('disabled', false).attr('required', true);
                 input.removeAttr('max min');
                 input.attr('data-sisa-bayar', sisaBayar);
+                input.attr('data-can-cicil', canCicil ? '1' : '0');
                 input.attr('title', canCicil ? 'Tagihan ini dapat dicicil' : 'Tagihan ini tidak dapat dicicil, pembayaran harus lunas');
 
-                const current = parseNominal(input.val());
-                if (fillDefault && current <= 0 && sisaBayar > 0) {
-                    input.val(formatNominal(sisaBayar));
+                if (canCicil) {
+                    input.prop('readonly', false);
+                    const current = parseNominal(input.val());
+                    if (fillDefault && current <= 0 && sisaBayar > 0) {
+                        input.val(formatNominal(sisaBayar));
+                    }
+                } else {
+                    input.prop('readonly', true);
+                    if (sisaBayar > 0) {
+                        input.val(formatNominal(sisaBayar));
+                    }
                 }
             };
 
@@ -534,6 +558,12 @@
                     syncNominalBayarInputs();
                 })
                 .on('input', 'input.nominal-bayar-input', function () {
+                    if ($(this).attr('data-can-cicil') !== '1') {
+                        const locked = Number($(this).attr('data-sisa-bayar')) || 0;
+                        $(this).val(formatNominal(locked));
+                        updateTotalTagihan();
+                        return;
+                    }
                     const sisaBayar = Number($(this).attr('data-sisa-bayar')) || 0;
                     let amount = parseNominal($(this).val());
                     if (sisaBayar > 0 && amount > sisaBayar) {
@@ -585,18 +615,18 @@
                     const data = await generateKuitansi(result);
                     if (!data || !data.data) throw createError('Gagal membuat kuitansi', 422);
 
-                    await generatePdf('KUITANSI', data.data, data.unit || false);
+                    await generatePdf('KUITANSI', data.data, data.unit || false, 'kuitansi teller - ' + resolveSiswaNis(result.siswa));
                 } catch (error) {
                     if (error.status === 422) {
                         errorAlert(error.message);
                         if (error.error || error.errors) processErros(error.error || error.errors);
                     } else {
                         const errorMessages = {
-                            401: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan!',
+                            401: 'Permintaan gagal diproses. Silakan coba lagi.',
                             403: 'Anda tidak memiliki izin untuk mengakses halaman ini 😖',
                             404: 'Halaman yang dituju tidak ditemukan 🧐',
                             405: 'Metode tidak valid 🧐 <br>silahkan muat ulang halaman dan coba lagi!',
-                            419: 'Sesi anda sudah habis 🙏 <br>Silahkan muat ulang halaman untuk melanjutkan!',
+                            419: 'Permintaan gagal diproses. Silakan coba lagi.',
                             429: 'Terlalu banyak permintaan akses <br>silahkan tunggu beberapa saat 🙏',
                         };
                         errorAlert(errorMessages[error.status] || 'Terjadi kesalahan, silahkan coba memuat ulang halaman');
@@ -619,7 +649,7 @@
                 data['tagihans'] = selectedRows;
 
                 const generatedBody = await generatePDFTagihan(data);
-                const pdf = await generatePdf('Tagihan Siswa', generatedBody, selectedSiswa.CODE02 || false);
+                const pdf = await generatePdf('Tagihan Siswa', generatedBody, selectedSiswa.CODE02 || false, 'pratinjau teller - ' + resolveSiswaNis(selectedSiswa));
 
                 if (pdf) { successAlert('Sukses, Rekap telah dicetak'); } else { Swal.close(); }
             }
@@ -643,7 +673,7 @@
                     if (xhr.status === 422) {
                         errorAlert('Data tidak ditemukan');
                     } else if (xhr.status === 419) {
-                        errorAlert('Sesi anda telah habis, Silahkan Login Kembali');
+                        errorAlert('Permintaan gagal diproses. Silakan coba lagi.');
                     } else if (xhr.status === 500) {
                         errorAlert('Tidak dapat terhubung ke server, Silahkan periksa koneksi internet anda');
                     } else if (xhr.status === 403) {
@@ -783,7 +813,16 @@
                 return descriptions[String(data)] || data;
             }
 
-            async function generatePdf(title, bodyContent, unit_logo) {
+            function resolveSiswaNis(siswa) {
+                const nis = String(siswa?.NOCUST || siswa?.nocust || '').trim();
+                if (nis && nis !== '-') {
+                    return nis;
+                }
+                const daftar = String(siswa?.NUM2ND || siswa?.num2nd || '').trim();
+                return daftar && daftar !== '-' ? daftar : '-';
+            }
+
+            async function generatePdf(title, bodyContent, unit_logo, fileTitle) {
                 unit_logo = unit_logo || false;
                 try {
                     let logo = 'data:image/jpeg;base64,' + headerLogo;
@@ -791,9 +830,11 @@
 
                     const orientation = 'portrait';
                     const pageMargins = [20, 20, 20, 20];
-                    const tanggalNow = new Date().toLocaleDateString('id-ID', {
-                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                    });
+                    const tanggalNow = typeof formatDateId === 'function'
+                        ? formatDateId(new Date())
+                        : new Date().toLocaleDateString('id-ID', {
+                            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                        }).replace(/^([^,]+),\s+/, '$1 ');
                     const availableWidth = getContentWidth('A4', orientation, pageMargins);
 
                     const headerTable = {
@@ -844,7 +885,12 @@
                         { text: title, style: 'title', margin: [0, 5, 0, 5] }
                     ].concat(bodyContent).concat([footer]);
 
+                    const docTitle = String(fileTitle || title || '');
                     const docDefinition = {
+                        info: {
+                            title: docTitle,
+                            subject: docTitle
+                        },
                         pageSize: 'A4',
                         pageOrientation: orientation,
                         pageMargins: pageMargins,
@@ -873,7 +919,9 @@
                 if (!value || value === '' || value === '0000-00-00 00:00:00') return '-';
                 const parsed = new Date(value);
                 if (Number.isNaN(parsed.getTime())) return '-';
-                return parsed.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                return typeof formatDateId === 'function'
+                    ? formatDateId(parsed)
+                    : parsed.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/^([^,]+),\s+/, '$1 ');
             }
 
             async function generateKuitansi(data) {

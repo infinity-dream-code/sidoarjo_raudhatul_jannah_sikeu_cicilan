@@ -16,6 +16,25 @@ Route::get('/cara-bayar/{token}/pdf', [\App\Http\Controllers\CaraBayarController
     ->name('cara-bayar.pdf');
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+Route::get('admin/session-ping', function () {
+    try {
+        if (!\Illuminate\Support\Facades\Auth::check()) {
+            \App\Support\PersistentLogin::restore();
+        }
+    } catch (\Throwable) {
+    }
+
+    $csrf = null;
+    try {
+        $csrf = csrf_token();
+    } catch (\Throwable) {
+    }
+
+    return response()->json([
+        'ok' => \Illuminate\Support\Facades\Auth::check(),
+        'csrf' => $csrf,
+    ]);
+})->name('admin.session-ping');
 Route::get("/reload-captcha", [AuthController::class, "reloadCaptcha"])->name("reload-captcha");
 Route::get("/reload-math-captcha", [\App\Http\Controllers\Auth\LoginController::class, "reloadMathCaptcha"])->name("reload-math-captcha");
 
@@ -24,12 +43,6 @@ Route::prefix("admin")
     ->middleware(["auth", "check.roles:admin"])
     ->group(function () {
         Route::get("/", [AdminController::class, "index"])->name("index");
-        Route::get("session-ping", function () {
-            return response()->json([
-                "ok" => true,
-                "csrf" => csrf_token(),
-            ]);
-        })->name("session-ping");
 
         Route::prefix("master-data")->name("master-data.")->group(function () {
             Route::get("get-logo", function (\Illuminate\Http\Request $request) {

@@ -42,11 +42,16 @@
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h5 class="mb-1">Pilih Tagihan Expired</h5>
-                <div class="text-muted small">Centang tagihan yang ingin diperpanjang, lalu klik Perpanjang.</div>
+                <div class="text-muted small">Centang tagihan yang ingin diperpanjang, atau perpanjang otomatis semua.</div>
             </div>
-            <a href="{{ $backUrl }}" class="btn btn-outline-secondary">
-                <i class="ri-arrow-left-line me-1"></i> Kembali ke Data Tagihan
-            </a>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-info" id="btn-auto-all">
+                    <i class="ri-calendar-check-line me-1"></i> Perpanjang Otomatis Semua
+                </button>
+                <a href="{{ $backUrl }}" class="btn btn-outline-secondary">
+                    <i class="ri-arrow-left-line me-1"></i> Kembali ke Data Tagihan
+                </a>
+            </div>
         </div>
         <div class="card-body">
             <form id="filter-form">
@@ -172,13 +177,17 @@
     <script src="{{ asset('main/libs/datatables-bs5/datatables-bootstrap5.js') }}"></script>
     <script>
         (function () {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             const dataUrl = @json($dataUrl);
             const storeUrl = @json($storeUrl);
+            const autoAllUrl = @json($autoAllUrl ?? '');
             const AUTO_EXP_DATE = @json($autoExpDate ?? '');
             const selectedMap = new Map();
             const modalEl = document.getElementById('modal-perpanjang-exp');
             const modal = new bootstrap.Modal(modalEl);
+
+            function currentCsrfToken() {
+                return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            }
 
             $('[data-control="select2"]').each(function () {
                 const $this = $(this);
@@ -350,6 +359,47 @@
                 modal.show();
             });
 
+            $('#btn-auto-all').on('click', function () {
+                if (!autoAllUrl) {
+                    errorAlert('Endpoint perpanjang otomatis belum tersedia.');
+                    return;
+                }
+                if (!confirm('Perpanjang otomatis SEMUA tagihan expired?\n\nTanggal baru: tgl 20 (hari ≤20 bulan ini, hari >20 bulan depan).')) {
+                    return;
+                }
+
+                loadingAlert('Memperpanjang otomatis semua tagihan expired...');
+                fetch(autoAllUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': currentCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({}),
+                })
+                    .then(async (res) => {
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw { status: res.status, message: data.message || res.statusText };
+                        return data;
+                    })
+                    .then((data) => {
+                        selectedMap.clear();
+                        syncSelectedCount();
+                        table.ajax.reload(null, false);
+                        successAlert(data.message || 'Perpanjang otomatis selesai.');
+                    })
+                    .catch((err) => {
+                        if (err.status === 419) {
+                            errorAlert('Sesi/CSRF sudah habis. Silahkan muat ulang halaman lalu coba lagi.');
+                            return;
+                        }
+                        errorAlert(err.message || 'Gagal perpanjang otomatis.');
+                    });
+            });
+
             $('#form-perpanjang-exp').on('submit', function (e) {
                 e.preventDefault();
                 const ids = Array.from(selectedMap.keys());
@@ -371,16 +421,18 @@
                 loadingAlert('Memperpanjang expired date...');
                 fetch(storeUrl, {
                     method: 'POST',
+                    credentials: 'same-origin',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
+                        'X-CSRF-TOKEN': currentCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest',
                     },
                     body: JSON.stringify(payload),
                 })
                     .then(async (res) => {
                         const data = await res.json().catch(() => ({}));
-                        if (!res.ok) throw { message: data.message || res.statusText };
+                        if (!res.ok) throw { status: res.status, message: data.message || res.statusText };
                         return data;
                     })
                     .then((data) => {
@@ -391,6 +443,10 @@
                         successAlert(data.message || 'Berhasil diperpanjang.');
                     })
                     .catch((err) => {
+                        if (err.status === 419) {
+                            errorAlert('Sesi/CSRF sudah habis. Silahkan muat ulang halaman lalu coba lagi.');
+                            return;
+                        }
                         errorAlert(err.message || 'Gagal memperpanjang.');
                     });
             });

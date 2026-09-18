@@ -9,11 +9,11 @@ use App\Models\scctbill;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
 use App\Support\ExcelImportSheet;
+use App\Support\InputTagihanProcedure;
 use App\Support\SchoolScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Validators\ValidationException;
@@ -75,6 +75,7 @@ class UploadTagihanExcelController extends Controller
             ['data' => 'kelas', 'name' => 'Kelas', 'searchable' => true, 'orderable' => true],
             ['data' => 'kelompok', 'name' => 'Kelompok', 'searchable' => true, 'orderable' => true],
             ['data' => 'nominal', 'name' => 'Nominal', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency'],
+            ['data' => 'exp_date', 'name' => 'ExpDate', 'searchable' => false, 'orderable' => false],
         ];
     }
 
@@ -128,7 +129,9 @@ class UploadTagihanExcelController extends Controller
             'scctcust.DESC04',
         ]));
 
-        $records = collect($cachedData)->map(function ($item) use ($select){
+        $previewExpDate = $this->resolvePreviewExpDate($request);
+
+        $records = collect($cachedData)->map(function ($item) use ($select, $previewExpDate) {
             $nis = $item['nis'];
             $siswa = scctcust::select($select)->where('scctcust.NOCUST', $nis);
             SchoolScope::apply($siswa, 'scctcust', $this->sekolah);
@@ -143,6 +146,7 @@ class UploadTagihanExcelController extends Controller
                 'nominal' => $item['nominal'] ?? null,
                 'status' => $item['status'] ?? 0,
                 'keterangan' => $item['keterangan'],
+                'exp_date' => $previewExpDate,
             ];
         });
 
@@ -239,81 +243,130 @@ class UploadTagihanExcelController extends Controller
         ], ValidationMessage::messages(), ValidationMessage::attributes());
 
         $data = Cache::get($this->resolvedCacheKey());
-        if (empty($data))return response()->json(['message' => 'Silahkan import data tagihan terlebih dahulu'], 422);
+        if (empty($data)) {
+            return response()->json(['message' => 'Silahkan import data tagihan terlebih dahulu'], 422);
+        }
 
         $bta = sprintf('%04d%02d', (int) $request->periode_tahun, (int) $request->periode_bulan);
-        $expDate = $request->filled('exp_date')
-            ? date('Y-m-d 23:59:59', strtotime((string) $request->exp_date))
-            : null;
 
         $tagihan = mst_tagihan::where('urut', $request->tagihan)->first();
-        if (!$tagihan) return response()->json(['message' => 'Tagihan tidak ditemukan, silahkan muat ulang halaman!'], 422);
+        if (!$tagihan) {
+            return response()->json(['message' => 'Tagihan tidak ditemukan, silahkan muat ulang halaman!'], 422);
+        }
+
+        $nmTagihan = trim((string) $tagihan->tagihan);
+        $isNyicil = (int) ($tagihan->isINSTALLMENT ?? 0);
 
         try {
-            DB::beginTransaction();
             $skippedInactive = [];
+            $failed = [];
             $insertedCount = 0;
+
             foreach ($data as $item) {
-                if ($item['status'] != 1) continue;
-                $siswa = scctcust::where('NOCUST', $item['nis']);
-                SchoolScope::apply($siswa, 'scctcust', $this->sekolah);
-                $siswa = $siswa->first();
-                if (!$siswa) return response()->json(['message' => "siswa dengan nis: {$item['nis']} tidak ditemukan!"], 422);
+                if (($item['status'] ?? null) != 1) {
+                    continue;
+                }
+
+                $siswaQuery = scctcust::where('NOCUST', $item['nis']);
+                SchoolScope::apply($siswaQuery, 'scctcust', $this->sekolah);
+                $siswa = $siswaQuery->first();
+
+                if (!$siswa) {
+                    return response()->json(['message' => "siswa dengan nis: {$item['nis']} tidak ditemukan!"], 422);
+                }
                 if ((int) ($siswa->STCUST ?? 0) === 0) {
                     $skippedInactive[] = trim(($item['nis'] ?? '-') . ' - ' . ($siswa->NMCUST ?? 'Tanpa Nama'));
                     continue;
                 }
 
-                $tagihanSiswaTerbaru = scctbill::where('CUSTID', $siswa->CUSTID)
-                    ->orderBy('FUrutan', 'DESC')
+                $nominal = (int) $item['nominal'];
+                $nocust = (string) ($siswa->NOCUST ?? $siswa->nocust ?? $item['nis']);
+                $beforeAa = (int) (scctbill::where('CUSTID', $siswa->CUSTID)->max('AA') ?? 0);
+
+                // ExpDate diisi otomatis oleh procedure InputTagihan
+                InputTagihanProcedure::call(
+                    $nocust,
+                    $nominal,
+                    $nmTagihan,
+                    $bta,
+                    $bta,
+                    $isNyicil,
+                );
+
+                $newBill = scctbill::where('CUSTID', $siswa->CUSTID)
+                    ->where('AA', '>', $beforeAa)
+                    ->orderByDesc('AA')
                     ->first();
 
-                $urut = $tagihanSiswaTerbaru ? $tagihanSiswaTerbaru['FUrutan'] + 1 : 1;
-                $billCD = date('Y') . '/i' . date('m') . '-' . ($urut + 1);
-                $nominal = (int) $item['nominal'];
+                if (!$newBill) {
+                    $failed[] = trim($nocust . ' - ' . ($siswa->NMCUST ?? ''));
+                    continue;
+                }
 
-                scctbill::create([
-                    'CUSTID' => $siswa->CUSTID,
-                    'BILLAC' => $bta,
-                    'BILLNM' => $tagihan->tagihan,
-                    'BILLAM' => $nominal,
-                    'BILLPAID' => 0,
-                    'PAYMENTLEFT' => $nominal,
-                    'PAIDST' => 0,
-                    'FUrutan' => $urut,
-                    'FTGLTagihan' => now(),
-                    'FSTSBolehBayar' => 1,
-                    'BTA' => $bta,
-                    'BILLCD' => $billCD,
-                    'INSTALLMENT' => 0,
-                    'isINSTALLABLE' => (int) ($tagihan->isINSTALLMENT ?? 0),
-                    'ExpDate' => $expDate,
-                ]);
+                // Pastikan tampil di Data Tagihan (procedure tidak set FSTSBolehBayar)
+                if ((int) ($newBill->FSTSBolehBayar ?? 0) !== 1 || $newBill->BILLPAID === null) {
+                    $newBill->FSTSBolehBayar = 1;
+                    if ($newBill->BILLPAID === null) {
+                        $newBill->BILLPAID = 0;
+                    }
+                    $newBill->save();
+                }
+
+                // Opsional: override ExpDate dari form jika diisi
+                if ($request->filled('exp_date')) {
+                    $newBill->ExpDate = date('Y-m-d 23:59:59', strtotime((string) $request->exp_date));
+                    $newBill->save();
+                }
+
                 $insertedCount++;
             }
 
             Cache::forget($this->resolvedCacheKey());
+            Cache::increment('data_tagihan_cache_version');
 
-            DB::commit();
-            $message = "Data tagihan disimpan! Berhasil dibuat untuk {$insertedCount} siswa.";
+            $message = "Data tagihan disimpan via InputTagihan. Berhasil dibuat untuk {$insertedCount} siswa.";
             if (!empty($skippedInactive)) {
                 $message .= '<hr>Tagihan tidak dibuat untuk siswa nonaktif (STCUST=0): ' . count($skippedInactive) . ' siswa.<br>' .
                     implode('<br>', $skippedInactive);
             }
+            if (!empty($failed)) {
+                $message .= '<hr>Gagal dibuat (procedure tidak insert): ' . count($failed) . ' siswa.<br>' .
+                    implode('<br>', $failed);
+            }
+
+            if ($insertedCount === 0 && empty($skippedInactive)) {
+                return response()->json(['message' => $message ?: 'Tidak ada tagihan yang berhasil dibuat.'], 422);
+            }
+
             return response()->json(['message' => $message], 200);
         } catch (\Throwable $e) {
-            DB::rollBack();
-
-            Log::error('Simpan tagihan excel gagal', [
+            Log::error('Simpan tagihan excel gagal (InputTagihan)', [
                 'user_id' => auth()->id(),
                 'message' => $e->getMessage(),
                 'exception' => $e,
             ]);
 
             return response()->json([
-                'message' => 'Terjadi kesalahan saat menyimpan data.<hr>' . $e->getMessage(),
+                'message' => 'Terjadi kesalahan saat menyimpan data (InputTagihan).<hr>' . $e->getMessage(),
                 'error' => $e->getMessage(),
             ], 422);
         }
+    }
+
+    /**
+     * Preview ExpDate: dari form jika diisi, selain itu ikuti logic InputTagihan (tgl 20).
+     */
+    private function resolvePreviewExpDate(Request $request): string
+    {
+        $fromForm = $request->input('exp_date') ?? $request->input('filter.exp_date');
+        if (filled($fromForm)) {
+            try {
+                return \Illuminate\Support\Carbon::parse($fromForm)->format('d-m-Y');
+            } catch (\Throwable) {
+                // fallback otomatis
+            }
+        }
+
+        return InputTagihanProcedure::resolveAutoExpDate()->format('d-m-Y');
     }
 }

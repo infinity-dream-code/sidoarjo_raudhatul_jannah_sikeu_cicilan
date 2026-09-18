@@ -158,7 +158,10 @@
                         <label class="form-label" for="exp_date">Expired Date (ExpDate)</label>
                         <input type="date" class="form-control" id="exp_date" name="exp_date"
                                min="{{ date('Y-m-d') }}">
-                        <div class="form-text">Opsional. Batas waktu bayar tagihan (kolom ExpDate).</div>
+                        <div class="form-text">
+                            Opsional. Kosongkan = otomatis dari procedure <code>InputTagihan</code>
+                            (tgl 20). Isi manual jika ingin override.
+                        </div>
                     </div>
                 </div>
             </form>
@@ -428,6 +431,13 @@
                             updateFilterWindowLocation(dtOptions.formId);
                             dataReFilter(dtOptions.tableId);
                         }, 0)
+                    });
+                    $('#exp_date').on('change', function () {
+                        if (typeof dataReFilter === 'function') {
+                            dataReFilter(dtOptions.tableId);
+                        } else {
+                            dataReload(dtOptions.tableId);
+                        }
                     });
                 }
             }

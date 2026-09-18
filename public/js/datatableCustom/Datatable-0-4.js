@@ -1066,12 +1066,32 @@ async function dataTableCreate(options) {
                     return $.extend({}, d, transformedData);
                 }
             }, error: function (xhr, error, code) {
+                let serverMessage = null;
+                try {
+                    serverMessage = xhr.responseJSON?.message || xhr.responseJSON?.error || null;
+                } catch (e) {
+                    serverMessage = null;
+                }
+
                 const descriptions = {
                     '401': 'Sesi anda telah habis, silahkan login kembali!',
+                    '403': 'Anda tidak memiliki izin untuk mengakses data ini.',
                     '404': 'Data tidak ditemukan!',
-                    '500': 'Internal Server Error',
+                    '419': 'Sesi/CSRF sudah habis. Silahkan muat ulang halaman lalu coba lagi!',
+                    '500': serverMessage || 'Internal Server Error',
+                    '502': 'Gateway error. Server database/jaringan sedang bermasalah.',
+                    '503': 'Layanan sedang tidak tersedia. Coba beberapa saat lagi.',
+                    'timeout': 'Permintaan timeout. Koneksi database mungkin lambat, coba muat ulang.',
+                    'parsererror': 'Respons server tidak valid.',
+                    'abort': 'Permintaan dibatalkan.',
                 };
-                errorAlert(descriptions[xhr.status] || 'Ada masalah saat mengambil data dari server, Silahkan muat ulang halaman');
+
+                const key = String(xhr.status || error || '');
+                errorAlert(
+                    descriptions[key]
+                    || serverMessage
+                    || 'Ada masalah saat mengambil data dari server, Silahkan muat ulang halaman'
+                );
             }
         },
         preDrawCallback: function (settings) {
@@ -1240,7 +1260,20 @@ async function dataTableCreate(options) {
             $footer.append(totalRow);
         },
         error: function (xhr, error, code) {
-            errorAlert('Data tidak dapat dimuat')
+            let serverMessage = null;
+            try {
+                serverMessage = xhr.responseJSON?.message || xhr.responseJSON?.error || null;
+            } catch (e) {
+                serverMessage = null;
+            }
+            const descriptions = {
+                '401': 'Sesi anda telah habis, silahkan login kembali!',
+                '419': 'Sesi/CSRF sudah habis. Silahkan muat ulang halaman lalu coba lagi!',
+                '500': serverMessage || 'Internal Server Error',
+                'timeout': 'Permintaan timeout. Koneksi database mungkin lambat, coba muat ulang.',
+            };
+            const key = String(xhr.status || error || '');
+            errorAlert(descriptions[key] || serverMessage || 'Data tidak dapat dimuat');
         }
     })
 }
@@ -1701,13 +1734,20 @@ async function getDT(options) {
         url: options.columnUrl,
         success: finishColumns,
             error: function (xhr) {
+                let serverMessage = null;
+                try {
+                    serverMessage = xhr.responseJSON?.message || xhr.responseJSON?.error || null;
+                } catch (e) {
+                    serverMessage = null;
+                }
                 const descriptions = {
                     401: 'Sesi anda telah habis, silahkan login kembali!',
                     403: 'Anda tidak memiliki izin untuk mengakses kolom data.',
                     404: 'Endpoint kolom data tidak ditemukan.',
-                    500: 'Gagal memuat definisi kolom tabel.',
+                    419: 'Sesi/CSRF sudah habis. Silahkan muat ulang halaman lalu coba lagi!',
+                    500: serverMessage || 'Gagal memuat definisi kolom tabel.',
                 };
-                errorAlert(descriptions[xhr.status] || 'Gagal memuat kolom tabel. Silahkan muat ulang halaman.');
+                errorAlert(descriptions[xhr.status] || serverMessage || 'Gagal memuat kolom tabel. Silahkan muat ulang halaman.');
             }
         });
 }

@@ -172,6 +172,7 @@ Route::prefix("admin")
                         Route::get("", "index")->name("index");
                         Route::get("get-data", "getData")->name("get-data");
                         Route::post("store", "store")->name("store");
+                        Route::post("auto-all", "autoAll")->name("auto-all");
                     });
 
                 Route::prefix("aktifasi-pembayaran-bank")
